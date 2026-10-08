@@ -16,6 +16,7 @@ urlpatterns = [
     path('api/auth/me/', views.PortalAuthMe.as_view(), name='portal-auth-me'),
     path('api/auth/logout/', views.PortalLogout.as_view(), name='portal-auth-logout'),
     path('api/admin/access-code/', views.SuperAdminAccessCode.as_view(), name='super-admin-access-code'),
+    path('api/admin/organisation-code/', views.SuperAdminOrganisationCode.as_view(), name='super-admin-organisation-code'),
     path('api/admin/users/', views.AdminUserManagement.as_view(), name='admin-users'),
     path('api/admin/students/', views.AdminStudentList.as_view(), name='admin-students'),
     path('api/admin/logout/', views.AdminLogout.as_view()),

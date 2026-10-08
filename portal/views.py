@@ -211,7 +211,9 @@ class PortalLogout(APIView):
             return Response({'error': 'That username is already in use.'}, status=400)
         if role in ('Admin', 'Counsellor'):
             expected = getattr(settings, 'PORTAL_ORGANISATION_CODE', '')
-            if not expected or values.get('organisation_code') != expected or not values.get('staff_id'):
+            saved_org = PortalAccessCode.objects.filter(name='organisation').first()
+            valid_org = check_password(values.get('organisation_code', ''), saved_org.code_hash) if saved_org else values.get('organisation_code') == expected
+            if not valid_org or not values.get('staff_id'):
                 return Response({'error': 'A valid staff ID and organisation code are required.'}, status=403)
         else:
             expected = getattr(settings, 'SUPER_ADMIN_ACCESS_CODE', '')
@@ -274,6 +276,19 @@ class SuperAdminAccessCode(StaffAPIView):
         if len(code) < 8:
             return Response({'error': 'The access code must be at least 8 characters.'}, status=400)
         item, _ = PortalAccessCode.objects.get_or_create(name='super_admin')
+        item.code_hash = make_password(code)
+        item.save(update_fields=['code_hash', 'updated_at'])
+        return Response({'ok': True})
+
+
+class SuperAdminOrganisationCode(StaffAPIView):
+    def post(self, request):
+        if not request.user.is_superuser:
+            return Response({'error': 'Super Admin access required.'}, status=403)
+        code = str(request.data.get('organisation_code', '')).strip()
+        if len(code) < 8:
+            return Response({'error': 'The organisation code must be at least 8 characters.'}, status=400)
+        item, _ = PortalAccessCode.objects.get_or_create(name='organisation')
         item.code_hash = make_password(code)
         item.save(update_fields=['code_hash', 'updated_at'])
         return Response({'ok': True})
