@@ -9,6 +9,7 @@ urlpatterns = [
     path('api/auth/', include('rest_framework.urls')),
     path('api/courses/', views.StudentCourseList.as_view(), name='course-list'),
     path('api/events/', views.StudentEventList.as_view(), name='event-list'),
+    path('api/options/', views.PortalOptions.as_view(), name='portal-options'),
     path('api/inquiries/', views.StudentInquiryCreate.as_view(), name='inquiry-create'),
     path('api/admin/csrf/', views.admin_csrf, name='admin-csrf'),
     path('api/admin/login/', views.AdminLogin.as_view(), name='admin-login'),

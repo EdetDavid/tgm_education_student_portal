@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth.models import Group, User
 
-from .models import Course, CourseOffering, Event, Inquiry, PortalAccessCode, StaffProfile, Student, University
+from .models import Course, CourseOffering, Event, Inquiry, PortalAccessCode, PortalOption, StaffProfile, Student, University
 
 
 admin.site.unregister(User)
@@ -121,3 +121,11 @@ class PortalAccessCodeAdmin(admin.ModelAdmin):
     list_display = ('name', 'updated_at')
     readonly_fields = ('name', 'code_hash', 'updated_at')
     description = 'Access codes are managed through the Super Admin portal. Hashes are never shown in plain text.'
+
+
+@admin.register(PortalOption)
+class PortalOptionAdmin(admin.ModelAdmin):
+    list_display = ('option_type', 'value', 'sort_order', 'active')
+    list_filter = ('option_type', 'active')
+    search_fields = ('value',)
+    list_editable = ('sort_order', 'active')

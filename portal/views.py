@@ -23,7 +23,7 @@ from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
 
-from .models import Course, Event, Inquiry, Student, StaffProfile, PortalAccessCode
+from .models import Course, Event, Inquiry, Student, StaffProfile, PortalAccessCode, PortalOption
 from .queries import filtered_inquiries
 from .csv_export import spreadsheet_safe
 from .serializers import (AdminInquirySerializer, AdminInquiryUpdateSerializer, AdminInquiryListUpdateSerializer,
@@ -122,6 +122,15 @@ class StudentInquiryCreate(generics.GenericAPIView):
             inquiry = Inquiry.objects.create(
                 **{**values, 'student': student, 'email': email, 'reference': reference})
         return Response({'reference': inquiry.reference, 'duplicate': False}, status=status.HTTP_201_CREATED)
+
+
+class PortalOptions(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        return Response({option_type: list(PortalOption.objects.filter(
+            option_type=option_type, active=True).values_list('value', flat=True))
+            for option_type in ('programme_type', 'destination', 'region')})
 
 
 @ensure_csrf_cookie

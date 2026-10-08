@@ -34,6 +34,18 @@ class PortalAccessCode(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
 
+class PortalOption(models.Model):
+    OPTION_TYPES = [('programme_type', 'Programme type'), ('destination', 'Destination'), ('region', 'Study region')]
+    option_type = models.CharField(max_length=40, choices=OPTION_TYPES)
+    value = models.CharField(max_length=120)
+    active = models.BooleanField(default=True)
+    sort_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['option_type', 'sort_order', 'value']
+        constraints = [models.UniqueConstraint(fields=['option_type', 'value'], name='portal_option_unique')]
+
+
 class Course(models.Model):
     name = models.CharField(max_length=160)
     institution = models.CharField(max_length=160, default='TGM Education Partner University')

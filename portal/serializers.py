@@ -5,14 +5,13 @@ from decimal import Decimal
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import Course, Event, Inquiry, StaffProfile, CourseOffering, University
+from .models import Course, Event, Inquiry, StaffProfile, CourseOffering, University, PortalOption
 from .intakes import available_intakes
 
 # create serializers 
 
-DESTINATIONS = ['United Kingdom', 'United States', 'Canada', 'Australia',
-                'Ireland', 'Germany', 'France', 'Netherlands']
-PROGRAMME_TYPES = ['Undergraduate', 'Postgraduate', 'PhD', 'Certificate', 'Diploma']
+def configured_options(option_type):
+    return list(PortalOption.objects.filter(option_type=option_type, active=True).values_list('value', flat=True))
 
 
 class CourseSerializer(serializers.ModelSerializer):
@@ -68,9 +67,9 @@ class StudentInquiryCreateSerializer(serializers.Serializer):
     course_id = serializers.PrimaryKeyRelatedField(
         source='course', queryset=Course.objects.filter(active=True))
     university_id = serializers.IntegerField(required=False, allow_null=True)
-    programme_type = serializers.ChoiceField(choices=PROGRAMME_TYPES, required=False, default='Undergraduate')
+    programme_type = serializers.CharField(max_length=40)
     intake = serializers.CharField(max_length=40, trim_whitespace=True)
-    destination = serializers.ChoiceField(choices=DESTINATIONS)
+    destination = serializers.CharField(max_length=100)
     destination_city = serializers.CharField(max_length=100, trim_whitespace=True, required=False, allow_blank=True, default='')
     student_location = serializers.CharField(
         max_length=120, trim_whitespace=True)
@@ -94,6 +93,16 @@ class StudentInquiryCreateSerializer(serializers.Serializer):
         value = value.strip()
         if value and len(value) < 2:
             raise serializers.ValidationError('Enter the city where you want to study.')
+        return value
+
+    def validate_programme_type(self, value):
+        if value not in configured_options('programme_type'):
+            raise serializers.ValidationError('Choose a configured programme type.')
+        return value
+
+    def validate_destination(self, value):
+        if value not in configured_options('destination'):
+            raise serializers.ValidationError('Choose a configured study destination.')
         return value
 
     def validate(self, attrs):
