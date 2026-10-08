@@ -49,13 +49,26 @@ class Course(models.Model):
         self.price), 'location': self.location, 'intakes': self.intakes}
 
 
+class University(models.Model):
+    name = models.CharField(max_length=160, unique=True)
+    country = models.CharField(max_length=100)
+    city = models.CharField(max_length=100)
+    image_url = models.URLField(max_length=500, blank=True)
+    active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['name']
+
+
 class CourseOffering(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='offerings')
+    university = models.ForeignKey(University, on_delete=models.PROTECT, related_name='course_offerings', null=True, blank=True)
     region = models.CharField(max_length=80)
     institution = models.CharField(max_length=160)
     country = models.CharField(max_length=100)
     city = models.CharField(max_length=100)
     active = models.BooleanField(default=True)
+    price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=['course', 'institution', 'city'], name='course_offering_unique')]
@@ -82,6 +95,7 @@ class Inquiry(models.Model):
     email = models.EmailField()
     phone = models.CharField(max_length=30)
     course = models.ForeignKey(Course, on_delete=models.PROTECT)
+    course_offering = models.ForeignKey(CourseOffering, on_delete=models.PROTECT, null=True, blank=True, related_name='inquiries')
     programme_type = models.CharField(max_length=40, default='Undergraduate')
     intake = models.CharField(max_length=40)
     destination = models.CharField(max_length=100)

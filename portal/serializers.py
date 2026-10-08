@@ -5,7 +5,7 @@ from decimal import Decimal
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import Course, Event, Inquiry, StaffProfile, CourseOffering
+from .models import Course, Event, Inquiry, StaffProfile, CourseOffering, University
 from .intakes import available_intakes
 
 # create serializers 
@@ -36,7 +36,12 @@ class PublicCourseSerializer(serializers.ModelSerializer):
         return available_intakes(course.intakes)
 
     def get_offerings(self, course):
-        return [{'region': item.region, 'institution': item.institution, 'country': item.country, 'city': item.city}
+        return [{'id': item.id, 'university_id': item.university_id, 'region': item.region,
+                 'institution': item.university.name if item.university_id else item.institution,
+                 'country': item.university.country if item.university_id else item.country,
+                 'city': item.university.city if item.university_id else item.city,
+                 'image_url': item.university.image_url if item.university_id else '',
+                 'price': str(item.price or course.price)}
                 for item in course.offerings.filter(active=True)]
 
     class Meta:
@@ -62,6 +67,7 @@ class StudentInquiryCreateSerializer(serializers.Serializer):
         min_length=7, max_length=30, trim_whitespace=True)
     course_id = serializers.PrimaryKeyRelatedField(
         source='course', queryset=Course.objects.filter(active=True))
+    university_id = serializers.IntegerField(required=False, allow_null=True)
     programme_type = serializers.ChoiceField(choices=PROGRAMME_TYPES, required=False, default='Undergraduate')
     intake = serializers.CharField(max_length=40, trim_whitespace=True)
     destination = serializers.ChoiceField(choices=DESTINATIONS)
@@ -89,6 +95,15 @@ class StudentInquiryCreateSerializer(serializers.Serializer):
         if value and len(value) < 2:
             raise serializers.ValidationError('Enter the city where you want to study.')
         return value
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        university_id = attrs.pop('university_id', None)
+        if university_id is not None:
+            if not CourseOffering.objects.filter(id=university_id, course=attrs['course'], active=True).exists():
+                raise serializers.ValidationError({'university_id': 'Choose a university offering this course.'})
+        attrs['course_offering_id'] = university_id
+        return attrs
 
     def validate_phone(self, value):
         if not re.fullmatch(r'[+\d().\-\s]{7,30}', value) or not 7 <= len(re.sub(r'\D', '', value)) <= 15:

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Course, CourseOffering, Event, Inquiry, PortalAccessCode, StaffProfile, Student
+from .models import Course, CourseOffering, Event, Inquiry, PortalAccessCode, StaffProfile, Student, University
 
 
 @admin.register(Course)
@@ -23,6 +23,14 @@ class CourseOfferingAdmin(admin.ModelAdmin):
     search_fields = ('course__name', 'institution', 'country', 'city')
     list_editable = ('active',)
     ordering = ('course__name', 'region', 'institution')
+
+
+@admin.register(University)
+class UniversityAdmin(admin.ModelAdmin):
+    list_display = ('name', 'country', 'city', 'active')
+    list_filter = ('country', 'active')
+    search_fields = ('name', 'country', 'city')
+    list_editable = ('active',)
 
 
 @admin.register(Event)
