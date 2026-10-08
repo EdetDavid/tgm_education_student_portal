@@ -17,6 +17,28 @@ COURSES = [
     'Psychology', 'Media and Communications', 'Project Management', 'Biomedical Science',
     'Hospitality Management', 'Education', 'Software Engineering', 'Economics',
 ]
+CATALOGUE = [
+    ('University of Manchester', 'Europe', 'United Kingdom', 'Manchester'),
+    ('University of Birmingham', 'Europe', 'United Kingdom', 'Birmingham'),
+    ('University of Edinburgh', 'Europe', 'United Kingdom', 'Edinburgh'),
+    ('University of Toronto', 'North America', 'Canada', 'Toronto'),
+    ('McGill University', 'North America', 'Canada', 'Montreal'),
+    ('University of British Columbia', 'North America', 'Canada', 'Vancouver'),
+    ('University of Melbourne', 'Oceania', 'Australia', 'Melbourne'),
+    ('UNSW Sydney', 'Oceania', 'Australia', 'Sydney'),
+    ('University of Sydney', 'Oceania', 'Australia', 'Sydney'),
+    ('Trinity College Dublin', 'Europe', 'Ireland', 'Dublin'),
+    ('University College Dublin', 'Europe', 'Ireland', 'Dublin'),
+    ('University of Amsterdam', 'Europe', 'Netherlands', 'Amsterdam'),
+    ('Technical University of Munich', 'Europe', 'Germany', 'Munich'),
+    ('Sorbonne University', 'Europe', 'France', 'Paris'),
+    ('University of California, Berkeley', 'North America', 'United States', 'Berkeley'),
+    ('University of Washington', 'North America', 'United States', 'Seattle'),
+    ('Northeastern University', 'North America', 'United States', 'Boston'),
+    ('University of Glasgow', 'Europe', 'United Kingdom', 'Glasgow'),
+    ('University of Leeds', 'Europe', 'United Kingdom', 'Leeds'),
+    ('University of Nottingham', 'Europe', 'United Kingdom', 'Nottingham'),
+]
 EVENTS = [
     ('TGM Education Lagos', 'Lagos', 'Eko Hotel'),
     ('TGM Education Abuja', 'Abuja', 'Transcorp Hilton'),
@@ -40,7 +62,9 @@ class Command(BaseCommand):
             raise CommandError('--inquiries must be between 0 and 10000.')
         courses = []
         for index, name in enumerate(COURSES):
+            institution, region, country, city = CATALOGUE[index]
             course, _ = Course.objects.get_or_create(name=name, defaults={
+                'institution': institution, 'region': region, 'study_country': country, 'study_city': city,
                 'level': 'Postgraduate' if index % 3 == 0 else 'Undergraduate',
                 'price': 18000 + index * 450, 'location': ['London', 'Manchester', 'Birmingham'][index % 3],
                 'intakes': ['January', 'May', 'September'],

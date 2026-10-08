@@ -65,7 +65,7 @@ class StudentCourseList(generics.ListAPIView):
         if query:
             queryset = queryset.filter(Q(name__icontains=query) | Q(
                 level__icontains=query) | Q(location__icontains=query))
-        for field in ['level', 'location']:
+        for field in ['level', 'region', 'study_country', 'study_city']:
             if self.request.query_params.get(field):
                 queryset = queryset.filter(
                     **{f'{field}__iexact': self.request.query_params[field].strip()})

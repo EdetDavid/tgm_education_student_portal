@@ -23,7 +23,7 @@ class CourseSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Course
-        fields = ['id', 'name', 'level', 'price',
+        fields = ['id', 'name', 'institution', 'region', 'study_country', 'study_city', 'level', 'price',
                   'location', 'intakes', 'active']
         read_only_fields = ['id']
 
@@ -36,7 +36,7 @@ class PublicCourseSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Course
-        fields = ['id', 'name', 'level', 'price',
+        fields = ['id', 'name', 'institution', 'region', 'study_country', 'study_city', 'level', 'price',
                   'location', 'intakes', 'intake_options']
 
 

@@ -36,6 +36,10 @@ class PortalAccessCode(models.Model):
 
 class Course(models.Model):
     name = models.CharField(max_length=160)
+    institution = models.CharField(max_length=160, default='TGM Education Partner University')
+    region = models.CharField(max_length=80, default='United Kingdom')
+    study_country = models.CharField(max_length=100, default='United Kingdom')
+    study_city = models.CharField(max_length=100, default='London')
     level = models.CharField(max_length=80)
     price = models.DecimalField(max_digits=12, decimal_places=2)
     location = models.CharField(max_length=100)
