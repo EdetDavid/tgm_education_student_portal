@@ -1,6 +1,33 @@
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
+from django.contrib.auth.models import Group, User
 
 from .models import Course, CourseOffering, Event, Inquiry, PortalAccessCode, StaffProfile, Student, University
+
+
+admin.site.unregister(User)
+admin.site.unregister(Group)
+
+
+@admin.register(User)
+class PortalUserAdmin(DjangoUserAdmin):
+    fieldsets = DjangoUserAdmin.fieldsets
+    add_fieldsets = DjangoUserAdmin.add_fieldsets + (
+        ('Portal access', {'fields': ('email', 'first_name', 'last_name', 'is_active', 'is_staff', 'groups')}),
+    )
+    list_display = ('username', 'email', 'portal_groups', 'is_staff', 'is_active', 'date_joined')
+    list_filter = ('is_staff', 'is_superuser', 'is_active', 'groups')
+    filter_horizontal = ('groups', 'user_permissions')
+
+    @admin.display(description='Groups')
+    def portal_groups(self, obj):
+        return ', '.join(obj.groups.values_list('name', flat=True)) or 'No group'
+
+
+@admin.register(Group)
+class PortalGroupAdmin(admin.ModelAdmin):
+    search_fields = ('name',)
+    filter_horizontal = ('permissions',)
 
 
 class CourseOfferingInline(admin.TabularInline):
