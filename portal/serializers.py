@@ -136,8 +136,8 @@ class StaffSignupSerializer(serializers.Serializer):
     staff_id = serializers.CharField(max_length=80, required=False, allow_blank=True)
     organisation_code = serializers.CharField(max_length=128, write_only=True, required=False, allow_blank=True)
     access_code = serializers.CharField(max_length=128, write_only=True, required=False, allow_blank=True)
-    email = serializers.EmailField(required=False)
-    full_name = serializers.CharField(max_length=120, required=False)
+    email = serializers.EmailField(required=False, allow_blank=True)
+    full_name = serializers.CharField(max_length=120, required=False, allow_blank=True)
 
 
 class AdminInquiryListUpdateSerializer(AdminInquiryUpdateSerializer):
