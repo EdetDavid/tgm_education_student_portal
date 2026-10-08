@@ -181,7 +181,39 @@ class StaffSignup(generics.GenericAPIView):
                 return Response({'error': 'That username or email is already registered.'}, status=400)
             user = User.objects.create_user(values['username'], email=values['email'], password=values['password'], first_name=values['full_name'])
             login(request, user)
-        return Response({'username': user.get_username(), 'role': role, 'full_name': user.first_name, 'email': user.email}, status=201)
+            return Response({'username': user.get_username(), 'role': role, 'full_name': user.first_name, 'email': user.email}, status=201)
+
+        if get_user_model().objects.filter(username=values['username']).exists():
+            return Response({'error': 'That username is already in use.'}, status=400)
+        if role in ('Admin', 'Counsellor'):
+            expected = getattr(settings, 'PORTAL_ORGANISATION_CODE', '')
+            saved_org = PortalAccessCode.objects.filter(name='organisation').first()
+            valid_org = check_password(values.get('organisation_code', ''), saved_org.code_hash) if saved_org else values.get('organisation_code') == expected
+            if not valid_org or not values.get('staff_id'):
+                return Response({'error': 'A valid staff ID and organisation code are required.'}, status=403)
+        else:
+            expected = getattr(settings, 'SUPER_ADMIN_ACCESS_CODE', '')
+            saved = PortalAccessCode.objects.filter(name='super_admin').first()
+            valid_access = check_password(values.get('access_code', ''), saved.code_hash) if saved else values.get('access_code') == expected
+            if not valid_access:
+                return Response({'error': 'The Super Admin access code is incorrect.'}, status=403)
+
+        User = get_user_model()
+        user = User.objects.create_user(values['username'], password=values['password'])
+        if role == 'Super Admin':
+            user.is_staff = True
+            user.is_superuser = True
+            user.save(update_fields=['is_staff', 'is_superuser'])
+        else:
+            user.is_staff = True
+            user.save(update_fields=['is_staff'])
+            if role == 'Counsellor':
+                group, _ = Group.objects.get_or_create(name='Counsellor')
+                user.groups.add(group)
+            StaffProfile.objects.create(user=user, role=role, staff_id=values['staff_id'],
+                                        organisation_code_hash=make_password(values['organisation_code']))
+        login(request, user)
+        return Response({'username': user.get_username(), 'role': role}, status=201)
 
 
 class PortalAuthMe(APIView):
@@ -207,36 +239,6 @@ class PortalLogout(APIView):
     def post(self, request):
         logout(request)
         return Response({'ok': True})
-        if get_user_model().objects.filter(username=values['username']).exists():
-            return Response({'error': 'That username is already in use.'}, status=400)
-        if role in ('Admin', 'Counsellor'):
-            expected = getattr(settings, 'PORTAL_ORGANISATION_CODE', '')
-            saved_org = PortalAccessCode.objects.filter(name='organisation').first()
-            valid_org = check_password(values.get('organisation_code', ''), saved_org.code_hash) if saved_org else values.get('organisation_code') == expected
-            if not valid_org or not values.get('staff_id'):
-                return Response({'error': 'A valid staff ID and organisation code are required.'}, status=403)
-        else:
-            expected = getattr(settings, 'SUPER_ADMIN_ACCESS_CODE', '')
-            saved = PortalAccessCode.objects.filter(name='super_admin').first()
-            valid_access = check_password(values.get('access_code', ''), saved.code_hash) if saved else values.get('access_code') == expected
-            if not valid_access:
-                return Response({'error': 'The Super Admin access code is incorrect.'}, status=403)
-        User = get_user_model()
-        user = User.objects.create_user(values['username'], password=values['password'])
-        if role == 'Super Admin':
-            user.is_staff = True
-            user.is_superuser = True
-            user.save(update_fields=['is_staff', 'is_superuser'])
-        else:
-            user.is_staff = True
-            user.save(update_fields=['is_staff'])
-            if role == 'Counsellor':
-                group, _ = Group.objects.get_or_create(name='Counsellor')
-                user.groups.add(group)
-            StaffProfile.objects.create(user=user, role=role, staff_id=values['staff_id'],
-                                        organisation_code_hash=make_password(values['organisation_code']))
-        login(request, user)
-        return Response({'username': user.get_username(), 'role': role}, status=201)
 
 
 class StaffAPIView(generics.GenericAPIView):
