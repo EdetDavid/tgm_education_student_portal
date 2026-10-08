@@ -1,12 +1,11 @@
 """Verify a synthetic submission and temporary staff login, then remove test data."""
 
 import argparse
-import http.cookiejar
 import json
 import os
 import secrets
+import subprocess
 import sys
-import urllib.request
 import uuid
 from pathlib import Path
 from urllib.parse import urlparse
@@ -32,11 +31,9 @@ def main():
     import django
     django.setup()
     from django.contrib.auth import get_user_model
-    from django.contrib.sessions.models import Session
     from portal.models import Inquiry, Student
 
-    jar = http.cookiejar.CookieJar()
-    client = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+    cookies = {}
     origin = args.origin.rstrip('/')
 
     def request(path, data=None, token=None):
@@ -45,10 +42,31 @@ def main():
             headers['Content-Type'] = 'application/json'
         if token:
             headers['X-CSRFToken'] = token
-        req = urllib.request.Request(origin + path, headers=headers,
-                                     data=json.dumps(data).encode() if data is not None else None)
-        with client.open(req, timeout=30) as response:
-            return response.status, json.load(response)
+        headers['Cookie'] = '; '.join(f'{name}={value}' for name, value in cookies.items())
+        # Node uses the OS trust store without disabling TLS verification. This
+        # also supports Windows corporate CA chains rejected by Python 3.14's
+        # stricter CA-extension validation. Credentials travel via stdin only.
+        script = """
+const chunks = [];
+for await (const chunk of process.stdin) chunks.push(chunk);
+const input = JSON.parse(Buffer.concat(chunks).toString());
+const response = await fetch(input.url, {headers: input.headers,
+  method: input.data === null ? 'GET' : 'POST',
+  body: input.data === null ? undefined : JSON.stringify(input.data),
+  signal: AbortSignal.timeout(30000)});
+console.log(JSON.stringify({status: response.status,
+  cookies: response.headers.getSetCookie(), data: await response.json()}));
+"""
+        result = subprocess.run(['node', '--use-system-ca', '--input-type=module', '-e', script],
+                                input=json.dumps({'url': origin + path, 'headers': headers, 'data': data}),
+                                text=True, capture_output=True, check=True, timeout=40)
+        response = json.loads(result.stdout)
+        for cookie in response['cookies']:
+            name, value = cookie.split(';', 1)[0].split('=', 1)
+            cookies[name] = value
+        if response['status'] >= 400:
+            raise RuntimeError(f"{path} returned HTTP {response['status']}: {response['data']}")
+        return response['status'], response['data']
 
     identifier = uuid.uuid4().hex
     email = f'deployment-{identifier}@example.com'
@@ -74,9 +92,9 @@ def main():
         request('/api/admin/inquiries/?q=' + first['reference'])
         print('PASS: production catalog, submission, duplicate reference, CSRF login, staff session and dashboard.')
     finally:
-        for cookie in jar:
-            if cookie.name == 'sessionid':
-                Session.objects.filter(session_key=cookie.value).delete()
+        if cookies.get('sessionid'):
+            from django.contrib.sessions.models import Session
+            Session.objects.filter(session_key=cookies['sessionid']).delete()
         Inquiry.objects.filter(email=email).delete()
         Student.objects.filter(email=email).delete()
         staff.delete()
