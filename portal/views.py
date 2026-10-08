@@ -216,6 +216,11 @@ class StaffAPIView(generics.GenericAPIView):
     permission_classes = [permissions.IsAdminUser]
     serializer_class = serializers.Serializer
 
+    def require_catalog_write(self):
+        if self.request.user.groups.filter(name='Counsellor').exists() and not self.request.user.is_superuser:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Counsellors have read-only access to courses.')
+
 
 class AdminLogout(StaffAPIView):
     def post(self, request):
@@ -373,6 +378,7 @@ class AdminCourseList(StaffAPIView):
         return Response({'courses': CourseSerializer(Course.objects.order_by('name'), many=True).data})
 
     def post(self, request):
+        self.require_catalog_write()
         serializer = CourseSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
@@ -392,6 +398,7 @@ class AdminCourseDetail(StaffAPIView):
         return Response({'course': self.get_serializer(self.get_object(course_id)).data})
 
     def patch(self, request, course_id):
+        self.require_catalog_write()
         course = self.get_object(course_id)
         serializer = CourseSerializer(course, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
@@ -399,6 +406,7 @@ class AdminCourseDetail(StaffAPIView):
         return Response({'course': serializer.data})
 
     def delete(self, request, course_id):
+        self.require_catalog_write()
         course = self.get_object(course_id)
         course.active = False
         course.save(update_fields=['active'])
@@ -412,6 +420,7 @@ class AdminEventList(StaffAPIView):
         return Response({'events': EventSerializer(Event.objects.order_by('date'), many=True).data})
 
     def post(self, request):
+        self.require_catalog_write()
         serializer = EventSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
@@ -431,6 +440,7 @@ class AdminEventDetail(StaffAPIView):
         return Response({'event': self.get_serializer(self.get_object(event_id)).data})
 
     def patch(self, request, event_id):
+        self.require_catalog_write()
         event = self.get_object(event_id)
         serializer = EventSerializer(event, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
@@ -438,6 +448,7 @@ class AdminEventDetail(StaffAPIView):
         return Response({'event': serializer.data})
 
     def delete(self, request, event_id):
+        self.require_catalog_write()
         event = self.get_object(event_id)
         try:
             event.delete()

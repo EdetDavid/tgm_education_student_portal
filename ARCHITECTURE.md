@@ -5,7 +5,8 @@ TGM Education · 8 October 2026
 ## Live project
 
 - [Student portal](https://tgm-student-portal-frontend.vercel.app/)
-- [Admin portal](https://tgm-student-portal-frontend.vercel.app/admin/)
+- [Staff portal](https://tgm-student-portal-frontend.vercel.app/portal/)
+- [Django admin](https://tgm-student-portal-backend.vercel.app/django-admin/)
 - [Backend](https://tgm-student-portal-backend.vercel.app/)
 - [API root](https://tgm-student-portal-backend.vercel.app/api/)
 
@@ -35,7 +36,7 @@ Student email is unique regardless of case. Inquiry reference is unique. Django 
 
 ![UML use case diagram showing student actions and authenticated staff actions](docs/diagrams/use-case.svg)
 
-Students search courses, choose a programme type and study destination, choose an event and submit interest without an account. Staff sign in to manage courses/events, search inquiries, update status and notes, read reports and export the filtered view. Current staff sessions expose Super Admin or Admin; the onboarding panel appears after each successful login. Counsellor and Student are defined as planned roles for a fuller authenticated user portal, not as separate permissions in this build.
+Students sign in to a dashboard with Apply, Profile and Application status sections. Staff sign in to the separate portal to manage inquiries, courses, events and reports. Super Admin has user management, access-code rotation and REST API access. Admin can manage courses/events and view registered students. Counsellors can view courses/events and registered students, but catalogue writes are rejected by the API. The Django admin is separate at /django-admin/.
 
 Reports include inquiry totals and trends, course demand, intake, location, destination, event capacity, status and potential revenue. Bar/pie charts respond to the same filters as the inquiry table and CSV. Potential revenue means matching inquiry count × current tuition, not income already collected.
 
