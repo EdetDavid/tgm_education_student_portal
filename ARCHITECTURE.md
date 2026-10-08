@@ -12,6 +12,12 @@ Put Neon PostgreSQL in a region close to the API, use separate production/stagin
 
 ## Database and relationships
 
+## Verified deployment status
+
+The production API is https://tgm-student-portal-backend.vercel.app/api/; the frontend proxies it successfully. Neon has 20 sample courses, 3 events and 240 synthetic inquiries. Production smoke checks passed for catalog access, submission, duplicate references, CSRF-protected staff login, session persistence across requests and dashboard access. The check removed only its temporary account, session and inquiry. A permanent production admin still needs creating (or explicit approval to copy the existing local staff login); local credentials were not transferred. Local PostgreSQL data was not changed by this cloud release.
+
+## Database design
+
 This workspace uses local PostgreSQL (`tgm_studentportal`); SQLite remains available for isolated browser tests and as a migration backup. Production uses hosted PostgreSQL through `POSTGRES_URL`, with `DATABASE_URL` accepted for Marketplace integrations. Production settings refuse to start without a secret and a PostgreSQL connection string. Vercel cannot use `localhost:5433` on the developer's laptop. Use Neon's pooled TLS connection for runtime traffic; server-side cursors are disabled and persistent Django connections are disabled on Vercel. Production database provisioning requires an authorized Neon account or Vercel Marketplace installation; no cloud database is implied by the local PostgreSQL migration.
 
 | Entity     | Responsibility and relationships                                                                                                                                                            |

@@ -2,6 +2,7 @@
 
 Django REST Framework backend for TGM Education's Student Portal. Frontend: https://tgm-student-portal-frontend.vercel.app/.
 Production API: https://tgm-student-portal-backend.vercel.app/api/.
+Production smoke checks passed; the temporary test account was removed. To create a permanent production admin, run `.\.venv\Scripts\python.exe scripts/release.py --env-file .env.vercel --create-admin`. Existing local staff credentials have not been copied.
 
 ## Local setup (PowerShell)
 
@@ -77,4 +78,4 @@ Verify backend /api/, /api/courses/, /api/events/ and /static/rest_framework/css
 
 Django uses a separate test database and removes it afterward. PostgreSQL test users need permission to create a test database. Do not point tests at production. Frontend unit and browser tests live in the frontend repository.
 
-Optional production smoke check: `.\.venv\Scripts\python.exe scripts/smoke_production.py`. It uses the ignored cloud profile, creates a temporary staff account and synthetic submission, verifies duplicate handling and authenticated frontend proxy access, then deletes only its own account, session and inquiry. This is a mutating check; run intentionally, not as a passive monitoring job.
+Optional production smoke check (Node.js 24+ required): `.\.venv\Scripts\python.exe scripts/smoke_production.py`. It uses the ignored cloud profile, creates a temporary staff account and synthetic submission, verifies duplicate handling and authenticated frontend proxy access, then deletes only its own account, session and inquiry. This is a mutating check; run intentionally, not as a passive monitoring job.
