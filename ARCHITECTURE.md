@@ -10,8 +10,6 @@ The frontend's `vercel.json` points to the deployed backend at https://tgm-stude
 
 Put Neon PostgreSQL in a region close to the API, use separate production/staging databases and secret stores, and give preview deployments only synthetic data. Build and run API tests, browser tests and migration checks in CI before release. Run `scripts/release.py` once as a release job, not whenever a request starts; it rejects local database URLs, checks production settings, migrates and optionally seeds synthetic records. Deploy backward-compatible schema changes before their consumers, retain the previous Vercel deployment for rollback, and test the complete login/submission flow before directing event traffic to a release. Run Django's deployment checks against the actual production environment. [Django deployment checklist](https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/).
 
-## Database and relationships
-
 ## Verified deployment status
 
 The production API is https://tgm-student-portal-backend.vercel.app/api/; the frontend proxies it successfully. Neon has 20 sample courses, 3 events and 240 synthetic inquiries. Production smoke checks passed for catalog access, submission, duplicate references, CSRF-protected staff login, session persistence across requests and dashboard access. The check removed only its temporary account, session and inquiry. A permanent production admin still needs creating (or explicit approval to copy the existing local staff login); local credentials were not transferred. Local PostgreSQL data was not changed by this cloud release.
