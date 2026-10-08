@@ -64,7 +64,7 @@ vercel --prod
 
 Release refuses local URLs, runs deployment checks/migrations, optionally seeds synthetic data and prompts for admin credentials. Omit optional flags on subsequent releases. Review security warnings before real event traffic. Vercel redacts Secret values on env pull: release.py replaces a redacted signing key with a temporary management-only key; it does not change the deployed secret. This is safe for migrations, seeding and password creation, which do not issue signed sessions/tokens.
 
-In the frontend Vercel project, set **BACKEND_URL** to the actual backend HTTPS origin without /api. Deploy the included frontend/vercel.mjs from the frontend repository; it proxies /api/* and /static/rest_framework/* and supports /admin/ refreshes. No secrets belong in VITE_* variables. API responses carry private/no-store cache headers.
+Deploy frontend/vercel.json from the frontend repository; it proxies /api/* and /static/rest_framework/* to https://tgm-student-portal-backend.vercel.app and supports /admin/ refreshes. No frontend API environment variable is required. If changing API hosts, update both external rewrite destinations and redeploy. No secrets belong in VITE_* variables. API responses carry private/no-store cache headers.
 
 Verify backend /api/, /api/courses/, /api/events/ and /static/rest_framework/css/bootstrap.min.css; then verify frontend search, submission/duplicate reference, staff login, reports and CSV. Anonymous admin requests must be denied. Project creation alone is not deployment; confirm the assigned URL and persistence after redeployment.
 
