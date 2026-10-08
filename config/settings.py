@@ -105,6 +105,9 @@ elif DATABASE_URL:
     }
     DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True
     DATABASES['default']['CONN_HEALTH_CHECKS'] = True
+    # An omitted URL port must not inherit local PGPORT=5433 via libpq.
+    DATABASES['default']['PORT'] = DATABASES['default'].get('PORT') or 5432
+    DATABASES['default']['OPTIONS']['connect_timeout'] = 10
 else:
     DATABASES = {
         'default': {
