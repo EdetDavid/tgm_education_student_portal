@@ -181,7 +181,32 @@ class StaffSignup(generics.GenericAPIView):
                 return Response({'error': 'That username or email is already registered.'}, status=400)
             user = User.objects.create_user(values['username'], email=values['email'], password=values['password'], first_name=values['full_name'])
             login(request, user)
-            return Response({'username': user.get_username(), 'role': role, 'full_name': user.first_name, 'email': user.email}, status=201)
+        return Response({'username': user.get_username(), 'role': role, 'full_name': user.first_name, 'email': user.email}, status=201)
+
+
+class PortalAuthMe(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        if user.is_superuser:
+            role = 'Super Admin'
+        elif user.is_staff and user.groups.filter(name='Counsellor').exists():
+            role = 'Counsellor'
+        elif user.is_staff:
+            role = 'Admin'
+        else:
+            role = 'Student'
+        return Response({'username': user.get_username(), 'role': role,
+                         'full_name': user.first_name, 'email': user.email})
+
+
+class PortalLogout(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        logout(request)
+        return Response({'ok': True})
         if get_user_model().objects.filter(username=values['username']).exists():
             return Response({'error': 'That username is already in use.'}, status=400)
         if role in ('Admin', 'Counsellor'):
