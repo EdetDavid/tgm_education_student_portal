@@ -23,12 +23,12 @@ from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
 
-from .models import Course, Event, Inquiry, Student, StaffProfile, PortalAccessCode, PortalOption
+from .models import Course, Event, Inquiry, Student, StaffProfile, PortalAccessCode, PortalOption, University
 from .queries import filtered_inquiries
 from .csv_export import spreadsheet_safe
 from .serializers import (AdminInquirySerializer, AdminInquiryUpdateSerializer, AdminInquiryListUpdateSerializer,
                           AdminLoginSerializer, CourseSerializer, EventSerializer,
-                          PublicCourseSerializer, StudentInquiryCreateSerializer, StaffSignupSerializer)
+                          PublicCourseSerializer, StudentInquiryCreateSerializer, StaffSignupSerializer, UniversitySerializer)
 
 
 # create views
@@ -434,6 +434,32 @@ class AdminCourseList(StaffAPIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response({'course': serializer.data}, status=status.HTTP_201_CREATED)
+
+
+class AdminUniversityList(StaffAPIView):
+    serializer_class = UniversitySerializer
+
+    def get(self, request):
+        return Response({'universities': UniversitySerializer(University.objects.order_by('name'), many=True).data})
+
+    def post(self, request):
+        self.require_catalog_write()
+        serializer = UniversitySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({'university': serializer.data}, status=status.HTTP_201_CREATED)
+
+
+class AdminUniversityDetail(StaffAPIView):
+    serializer_class = UniversitySerializer
+
+    def patch(self, request, university_id):
+        self.require_catalog_write()
+        university = University.objects.get(pk=university_id)
+        serializer = UniversitySerializer(university, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({'university': serializer.data})
 
 
 class AdminCourseDetail(StaffAPIView):

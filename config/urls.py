@@ -28,6 +28,8 @@ urlpatterns = [
     path('api/admin/inquiries/<int:inquiry_id>/', views.AdminInquiryDetail.as_view()),
     path('api/admin/courses/', views.AdminCourseList.as_view(), name='admin-courses'),
     path('api/admin/courses/<int:course_id>/', views.AdminCourseDetail.as_view()),
+    path('api/admin/universities/', views.AdminUniversityList.as_view(), name='admin-universities'),
+    path('api/admin/universities/<int:university_id>/', views.AdminUniversityDetail.as_view(), name='admin-university-detail'),
     path('api/admin/events/', views.AdminEventList.as_view(), name='admin-events'),
     path('api/admin/events/<int:event_id>/', views.AdminEventDetail.as_view()),
 ]

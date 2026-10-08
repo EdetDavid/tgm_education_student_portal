@@ -27,6 +27,13 @@ class CourseSerializer(serializers.ModelSerializer):
         read_only_fields = ['id']
 
 
+class UniversitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = University
+        fields = ['id', 'name', 'country', 'city', 'image_url', 'active']
+        read_only_fields = ['id']
+
+
 class PublicCourseSerializer(serializers.ModelSerializer):
     intake_options = serializers.SerializerMethodField()
     offerings = serializers.SerializerMethodField()
