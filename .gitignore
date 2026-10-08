@@ -28,6 +28,7 @@ htmlcov/
 .vercel/
 .agents/
 skills-lock.json
+docs/.qa/
 
 .vercel
 .env*

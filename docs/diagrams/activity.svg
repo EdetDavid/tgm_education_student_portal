@@ -1,0 +1,76 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='1200' height='1320' viewBox='0 0 1200 1320' role='img'><rect width='1200' height='1320' fill='white'/>
+<text x='295' y='48' text-anchor='middle' font-family='Arial, sans-serif' font-size='28' font-weight='700' fill='#203747'>Student / browser</text>
+<text x='905' y='48' text-anchor='middle' font-family='Arial, sans-serif' font-size='28' font-weight='700' fill='#203747'>Django API / PostgreSQL</text>
+<polyline points='600,75 600,1300' fill='none' stroke='#D7E0E5' stroke-width='2.5' stroke-dasharray='8 6'/>
+<ellipse cx='260' cy='87' rx='15' ry='15' fill='#203747' stroke='#203747' stroke-width='2'/>
+<polyline points='260,102 260,140' fill='none' stroke='#526675' stroke-width='2.5' />
+<polygon points='260,140 254.3454,128.2942 265.6545,128.2942' fill='#526675'/>
+<rect x='85' y='140' width='350' height='105' fill='#F5F8FA' stroke='#203747' stroke-width='2'/>
+<text x='260' y='186' text-anchor='middle' font-family='Arial, sans-serif' font-size='26' font-weight='400' fill='#203747'>Search / choose course</text>
+<text x='260' y='218.5' text-anchor='middle' font-family='Arial, sans-serif' font-size='26' font-weight='400' fill='#203747'>Complete inquiry form</text>
+<polyline points='260,245 260,290' fill='none' stroke='#526675' stroke-width='2.5' />
+<polygon points='260,290 254.3454,278.2942 265.6545,278.2942' fill='#526675'/>
+<polygon points='260,290 385,355 260,420 135,355 260,290' fill='#E8F4F1'/>
+<polyline points='260,290 385,355 260,420 135,355 260,290' fill='none' stroke='#526675' stroke-width='2.5' />
+<text x='260' y='364.375' text-anchor='middle' font-family='Arial, sans-serif' font-size='25' font-weight='400' fill='#203747'>Client valid?</text>
+<polyline points='135,355 45,355 45,190 85,190' fill='none' stroke='#526675' stroke-width='2.5' />
+<polygon points='85,190 73.29419,195.6546 73.29419,184.3454' fill='#526675'/>
+<text x='135' y='281' text-anchor='middle' font-family='Arial, sans-serif' font-size='20' font-weight='400' fill='#203747'>No: fix form</text>
+<polyline points='260,420 260,475' fill='none' stroke='#526675' stroke-width='2.5' />
+<polygon points='260,475 254.3454,463.2942 265.6545,463.2942' fill='#526675'/>
+<text x='305' y='455.125' text-anchor='middle' font-family='Arial, sans-serif' font-size='23' font-weight='400' fill='#203747'>Yes</text>
+<rect x='85' y='475' width='350' height='85' fill='white' stroke='#203747' stroke-width='2'/>
+<text x='260' y='527.25' text-anchor='middle' font-family='Arial, sans-serif' font-size='26' font-weight='400' fill='#203747'>POST /api/inquiries/</text>
+<polyline points='435,517 710,517' fill='none' stroke='#526675' stroke-width='2.5' />
+<polygon points='710,517 698.2942,522.6545 698.2942,511.3455' fill='#526675'/>
+<rect x='710' y='475' width='365' height='85' fill='#E8F4F1' stroke='#203747' stroke-width='2'/>
+<text x='892.5' y='511.25' text-anchor='middle' font-family='Arial, sans-serif' font-size='25' font-weight='400' fill='#203747'>Validate fields, course,</text>
+<text x='892.5' y='542.5' text-anchor='middle' font-family='Arial, sans-serif' font-size='25' font-weight='400' fill='#203747'>intake and upcoming event</text>
+<polyline points='892,560 892,610' fill='none' stroke='#526675' stroke-width='2.5' />
+<polygon points='892,610 886.3455,598.2942 897.6545,598.2942' fill='#526675'/>
+<polygon points='892,610 1024.5,680 892,750 759.5,680 892,610' fill='#E8F4F1'/>
+<polyline points='892,610 1024.5,680 892,750 759.5,680 892,610' fill='none' stroke='#526675' stroke-width='2.5' />
+<text x='892' y='689.375' text-anchor='middle' font-family='Arial, sans-serif' font-size='25' font-weight='400' fill='#203747'>Server valid?</text>
+<polyline points='760,680 645,680 645,265 450,265 450,215 435,215' fill='none' stroke='#526675' stroke-width='2.5' />
+<polygon points='435,215 446.7058,209.3454 446.7058,220.6546' fill='#526675'/>
+<text x='847.5' y='331.5' text-anchor='middle' font-family='Arial, sans-serif' font-size='24' font-weight='400' fill='#203747'>No: return errors</text>
+<text x='847.5' y='361.5' text-anchor='middle' font-family='Arial, sans-serif' font-size='24' font-weight='400' fill='#203747'>HTTP 400; correct form</text>
+<polyline points='892,750 892,800' fill='none' stroke='#526675' stroke-width='2.5' />
+<polygon points='892,800 886.3455,788.2942 897.6545,788.2942' fill='#526675'/>
+<text x='940' y='781.125' text-anchor='middle' font-family='Arial, sans-serif' font-size='23' font-weight='400' fill='#203747'>Yes</text>
+<rect x='710' y='800' width='365' height='90' fill='#E8F4F1' stroke='#203747' stroke-width='2'/>
+<text x='892.5' y='839' text-anchor='middle' font-family='Arial, sans-serif' font-size='24' font-weight='400' fill='#203747'>Normalize email; get student</text>
+<text x='892.5' y='869' text-anchor='middle' font-family='Arial, sans-serif' font-size='24' font-weight='400' fill='#203747'>Lock row in transaction</text>
+<polyline points='892,890 892,935' fill='none' stroke='#526675' stroke-width='2.5' />
+<polygon points='892,935 886.3455,923.2942 897.6545,923.2942' fill='#526675'/>
+<text x='725' y='937' text-anchor='middle' font-family='Arial, sans-serif' font-size='22' font-weight='400' fill='#203747'>Same student,</text>
+<text x='725' y='964.5' text-anchor='middle' font-family='Arial, sans-serif' font-size='22' font-weight='400' fill='#203747'>course + event</text>
+<polygon points='892,935 1034.5,1005 892,1075 749.5,1005 892,935' fill='#E8F4F1'/>
+<polyline points='892,935 1034.5,1005 892,1075 749.5,1005 892,935' fill='none' stroke='#526675' stroke-width='2.5' />
+<text x='892' y='998.75' text-anchor='middle' font-family='Arial, sans-serif' font-size='25' font-weight='400' fill='#203747'>Repeat within</text>
+<text x='892' y='1030' text-anchor='middle' font-family='Arial, sans-serif' font-size='25' font-weight='400' fill='#203747'>24 hours?</text>
+<polyline points='750,1005 460,1005' fill='none' stroke='#526675' stroke-width='2.5' />
+<polygon points='460,1005 471.7058,999.3455 471.7058,1010.655' fill='#526675'/>
+<text x='600' y='987.125' text-anchor='middle' font-family='Arial, sans-serif' font-size='23' font-weight='400' fill='#203747'>Yes</text>
+<rect x='100' y='965' width='360' height='85' fill='white' stroke='#203747' stroke-width='2'/>
+<text x='280' y='1001.5' text-anchor='middle' font-family='Arial, sans-serif' font-size='24' font-weight='400' fill='#203747'>Reuse existing reference</text>
+<text x='280' y='1031.5' text-anchor='middle' font-family='Arial, sans-serif' font-size='24' font-weight='400' fill='#203747'>HTTP 200; duplicate = true</text>
+<polyline points='280,1050 280,1160' fill='none' stroke='#526675' stroke-width='2.5' />
+<polygon points='280,1160 274.3455,1148.294 285.6545,1148.294' fill='#526675'/>
+<polyline points='892,1075 892,1120' fill='none' stroke='#526675' stroke-width='2.5' />
+<polygon points='892,1120 886.3455,1108.294 897.6545,1108.294' fill='#526675'/>
+<text x='942.5' y='1106.125' text-anchor='middle' font-family='Arial, sans-serif' font-size='23' font-weight='400' fill='#203747'>No</text>
+<rect x='710' y='1120' width='365' height='110' fill='#E8F4F1' stroke='#203747' stroke-width='2'/>
+<text x='892.5' y='1155.75' text-anchor='middle' font-family='Arial, sans-serif' font-size='22' font-weight='400' fill='#203747'>Create inquiry + reference</text>
+<text x='892.5' y='1183.25' text-anchor='middle' font-family='Arial, sans-serif' font-size='22' font-weight='400' fill='#203747'>Commit transaction</text>
+<text x='892.5' y='1210.75' text-anchor='middle' font-family='Arial, sans-serif' font-size='22' font-weight='400' fill='#203747'>HTTP 201</text>
+<polyline points='710,1170 530,1170 530,1200 460,1200' fill='none' stroke='#526675' stroke-width='2.5' />
+<polygon points='460,1200 471.7058,1194.345 471.7058,1205.655' fill='#526675'/>
+<rect x='100' y='1160' width='360' height='90' fill='#F5F8FA' stroke='#203747' stroke-width='2'/>
+<text x='280' y='1198.5' text-anchor='middle' font-family='Arial, sans-serif' font-size='26' font-weight='400' fill='#203747'>Show confirmation</text>
+<text x='280' y='1231' text-anchor='middle' font-family='Arial, sans-serif' font-size='26' font-weight='400' fill='#203747'>and reference number</text>
+<polyline points='280,1250 280,1280' fill='none' stroke='#526675' stroke-width='2.5' />
+<polygon points='280,1280 274.3455,1268.294 285.6545,1268.294' fill='#526675'/>
+<ellipse cx='280' cy='1295' rx='15' ry='15' fill='white' stroke='#203747' stroke-width='2'/>
+<ellipse cx='280' cy='1295' rx='8' ry='8' fill='#203747' stroke='#203747' stroke-width='2'/>
+</svg>

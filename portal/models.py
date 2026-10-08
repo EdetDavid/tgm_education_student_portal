@@ -1,5 +1,6 @@
 from django.db import models
 from django.db.models.functions import Lower
+from django.contrib.auth.models import User
 
 
 class Student(models.Model):
@@ -17,6 +18,20 @@ class Student(models.Model):
     def save(self, *args, **kwargs):
         self.email = self.email.strip().lower()
         return super().save(*args, **kwargs)
+
+
+class StaffProfile(models.Model):
+    ROLE_CHOICES = [('Admin', 'Admin'), ('Counsellor', 'Counsellor')]
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='staff_profile')
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    staff_id = models.CharField(max_length=80, unique=True)
+    organisation_code_hash = models.CharField(max_length=128)
+
+
+class PortalAccessCode(models.Model):
+    name = models.CharField(max_length=40, unique=True, default='super_admin')
+    code_hash = models.CharField(max_length=128)
+    updated_at = models.DateTimeField(auto_now=True)
 
 
 class Course(models.Model):
@@ -50,8 +65,10 @@ class Inquiry(models.Model):
     email = models.EmailField()
     phone = models.CharField(max_length=30)
     course = models.ForeignKey(Course, on_delete=models.PROTECT)
+    programme_type = models.CharField(max_length=40, default='Undergraduate')
     intake = models.CharField(max_length=40)
     destination = models.CharField(max_length=100)
+    destination_city = models.CharField(max_length=100, blank=True)
     student_location = models.CharField(max_length=120)
     event = models.ForeignKey(Event, on_delete=models.PROTECT)
     message = models.TextField(blank=True)

@@ -1,0 +1,33 @@
+@startuml
+left to right direction
+actor Student
+actor Staff
+rectangle "Student Portal" {
+  usecase "Search / filter courses" as Search
+  usecase "View fees and intakes" as Fees
+  usecase "Submit interest\n(optional message)" as Submit
+  usecase "See confirmation and reference" as Confirm
+  usecase "Sign in / sign out" as Login
+  usecase "Manage courses" as Courses
+  usecase "Manage events" as Events
+  usecase "Search / filter / open inquiries" as Inquiries
+  usecase "Update status and internal notes" as Notes
+  usecase "View dashboard and reports" as Reports
+  usecase "Export filtered CSV" as Export
+}
+Student -- Search
+Student -- Fees
+Student -- Submit
+Student -- Confirm
+Staff -- Login
+Staff -- Courses
+Staff -- Events
+Staff -- Inquiries
+Staff -- Notes
+Staff -- Reports
+Staff -- Export
+note bottom of Staff
+  Authenticated staff session required except for sign-in.
+  No separate specialist staff roles in this build.
+end note
+@enduml

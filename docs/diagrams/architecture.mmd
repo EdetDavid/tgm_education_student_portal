@@ -1,0 +1,7 @@
+flowchart TB
+    Browser[Student or staff browser] -->|HTTPS| Frontend[React / Vite - Vercel frontend]
+    Frontend -->|Same-origin /api/* and DRF static rewrites| API[Django REST Framework - Vercel Python / WSGI]
+    API -->|Pooled PostgreSQL / TLS| Database[(Neon PostgreSQL)]
+    GitHub[Two GitHub repositories] -. Push / deploy .-> Frontend
+    GitHub -. Push / deploy .-> API
+    Release[Release and migration scripts] -. Direct PostgreSQL / TLS .-> Database

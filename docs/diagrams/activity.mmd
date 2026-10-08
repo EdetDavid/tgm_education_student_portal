@@ -1,0 +1,14 @@
+flowchart TD
+    Start((Start)) --> Form[Search / select course and complete inquiry form]
+    Form --> Client{Client validation passes?}
+    Client -->|No: show errors| Form
+    Client -->|Yes| Submit[POST /api/inquiries/]
+    Submit --> Server{Server validation passes?}
+    Server -->|No: HTTP 400 with field errors| Form
+    Server -->|Yes| Lock[Normalize email, get student, lock student row in transaction]
+    Lock --> Duplicate{Same student, course and event within 24 hours?}
+    Duplicate -->|Yes| Existing[Return existing reference / HTTP 200 / duplicate true]
+    Duplicate -->|No| Create[Create inquiry and reference; commit / HTTP 201]
+    Existing --> Confirmation[Show confirmation and reference number]
+    Create --> Confirmation
+    Confirmation --> Finish((End))

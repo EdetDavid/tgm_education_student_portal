@@ -34,6 +34,7 @@ ALLOWED_HOSTS = os.environ.get(
 
 # Application definition
 INSTALLED_APPS = [
+    'django.contrib.admin',
     'django.contrib.contenttypes',
     'django.contrib.auth',
     'django.contrib.sessions',
@@ -57,6 +58,8 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'config.urls'
+PORTAL_ORGANISATION_CODE = os.getenv('PORTAL_ORGANISATION_CODE', '')
+SUPER_ADMIN_ACCESS_CODE = os.getenv('SUPER_ADMIN_ACCESS_CODE', '')
 
 TEMPLATES = [
     {

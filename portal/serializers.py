@@ -5,13 +5,14 @@ from decimal import Decimal
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import Course, Event, Inquiry
+from .models import Course, Event, Inquiry, StaffProfile
 from .intakes import available_intakes
 
 # create serializers 
 
 DESTINATIONS = ['United Kingdom', 'United States', 'Canada', 'Australia',
                 'Ireland', 'Germany', 'France', 'Netherlands']
+PROGRAMME_TYPES = ['Undergraduate', 'Postgraduate', 'PhD', 'Certificate', 'Diploma']
 
 
 class CourseSerializer(serializers.ModelSerializer):
@@ -56,8 +57,10 @@ class StudentInquiryCreateSerializer(serializers.Serializer):
         min_length=7, max_length=30, trim_whitespace=True)
     course_id = serializers.PrimaryKeyRelatedField(
         source='course', queryset=Course.objects.filter(active=True))
+    programme_type = serializers.ChoiceField(choices=PROGRAMME_TYPES, required=False, default='Undergraduate')
     intake = serializers.CharField(max_length=40, trim_whitespace=True)
     destination = serializers.ChoiceField(choices=DESTINATIONS)
+    destination_city = serializers.CharField(max_length=100, trim_whitespace=True, required=False, allow_blank=True, default='')
     student_location = serializers.CharField(
         max_length=120, trim_whitespace=True)
     event_id = serializers.PrimaryKeyRelatedField(
@@ -75,6 +78,12 @@ class StudentInquiryCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 'Enter your city and country, for example Lagos, Nigeria.')
         return ', '.join(parts)
+
+    def validate_destination_city(self, value):
+        value = value.strip()
+        if value and len(value) < 2:
+            raise serializers.ValidationError('Enter the city where you want to study.')
+        return value
 
     def validate_phone(self, value):
         if not re.fullmatch(r'[+\d().\-\s]{7,30}', value) or not 7 <= len(re.sub(r'\D', '', value)) <= 15:
@@ -104,7 +113,7 @@ class AdminInquirySerializer(serializers.ModelSerializer):
     class Meta:
         model = Inquiry
         fields = ['id', 'reference', 'full_name', 'email', 'phone', 'course', 'course_id', 'price',
-                  'intake', 'destination', 'student_location', 'event', 'event_id', 'message',
+                  'programme_type', 'intake', 'destination', 'destination_city', 'student_location', 'event', 'event_id', 'message',
                   'status', 'internal_notes', 'created_at']
 
 
@@ -117,6 +126,18 @@ class AdminInquiryUpdateSerializer(serializers.ModelSerializer):
 class AdminLoginSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=150)
     password = serializers.CharField(write_only=True, trim_whitespace=False)
+    role = serializers.ChoiceField(choices=['Super Admin', 'Admin', 'Counsellor', 'Student'], default='Admin')
+
+
+class StaffSignupSerializer(serializers.Serializer):
+    username = serializers.CharField(max_length=150)
+    password = serializers.CharField(write_only=True, min_length=8, trim_whitespace=False)
+    role = serializers.ChoiceField(choices=['Super Admin', 'Admin', 'Counsellor', 'Student'])
+    staff_id = serializers.CharField(max_length=80, required=False, allow_blank=True)
+    organisation_code = serializers.CharField(max_length=128, write_only=True, required=False, allow_blank=True)
+    access_code = serializers.CharField(max_length=128, write_only=True, required=False, allow_blank=True)
+    email = serializers.EmailField(required=False)
+    full_name = serializers.CharField(max_length=120, required=False)
 
 
 class AdminInquiryListUpdateSerializer(AdminInquiryUpdateSerializer):

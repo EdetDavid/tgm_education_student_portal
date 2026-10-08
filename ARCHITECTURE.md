@@ -1,57 +1,66 @@
-# Student Portal — production architecture
+# Student Portal — architecture
 
 TGM Education · 8 October 2026
 
-## Hosting and release process
+## Live project
 
-The deployment uses two Vercel projects: the existing React/Vite frontend at https://tgm-student-portal-frontend.vercel.app/ and a separate Django REST Framework backend named `tgm-student-portal-backend`. The backend repository is `EdetDavid/tgm_education_student_portal` and contains Django directly at its root; the frontend repository is `EdetDavid/tgm_student_portal_frontend`. Do not use the workspace's legacy combined root configuration for either project. Vercel detects the backend's `manage.py`, loads `config.wsgi.application`, installs Python dependencies and collects static files for CDN delivery. A managed Gunicorn container remains a future option for long-running jobs, not the selected deployment. [Vercel Django deployment](https://vercel.com/docs/frameworks/full-stack/django).
+- [Student portal](https://tgm-student-portal-frontend.vercel.app/)
+- [Admin portal](https://tgm-student-portal-frontend.vercel.app/admin/)
+- [Backend](https://tgm-student-portal-backend.vercel.app/)
+- [API root](https://tgm-student-portal-backend.vercel.app/api/)
 
-The frontend's `vercel.json` points to the deployed backend at https://tgm-student-portal-backend.vercel.app and creates external rewrites for `/api/*` and `/static/rest_framework/*`; `/admin/` resolves to the React entry point. Browsers keep the frontend origin, so Django's Secure, HttpOnly session cookie works without cross-site cookie exceptions. Django trusts the exact frontend HTTPS origin for CSRF and permits only explicitly configured hosts. All API responses carry private/no-store cache headers to keep session tokens and inquiries out of shared CDN caches. A project being created does not prove deployment: the API, migrations, submission and login flows must pass production smoke tests before the backend is considered live. [Vercel rewrites](https://vercel.com/docs/routing/rewrites).
+Use **/api/** to browse the backend; the backend's bare root is not a separate landing page. Public resources: [courses](https://tgm-student-portal-backend.vercel.app/api/courses/), [events](https://tgm-student-portal-backend.vercel.app/api/events/) and the [inquiry submission endpoint](https://tgm-student-portal-backend.vercel.app/api/inquiries/). [Browsable API sign-in](https://tgm-student-portal-backend.vercel.app/api/auth/login/) supports staff-only endpoints.
 
-Put Neon PostgreSQL in a region close to the API, use separate production/staging databases and secret stores, and give preview deployments only synthetic data. Build and run API tests, browser tests and migration checks in CI before release. Run `scripts/release.py` once as a release job, not whenever a request starts; it rejects local database URLs, checks production settings, migrates and optionally seeds synthetic records. Deploy backward-compatible schema changes before their consumers, retain the previous Vercel deployment for rollback, and test the complete login/submission flow before directing event traffic to a release. Run Django's deployment checks against the actual production environment. [Django deployment checklist](https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/).
+The verified migration snapshot has 20 courses, 4 events, 243 students, 243 inquiries and 2 active staff accounts. Local records were merged into Neon without duplicating the demo references. Password hashes and permissions were preserved; staff use their existing credentials. Sessions were not copied. The local database remains unchanged.
 
-## Verified deployment status
+## Deployment
 
-The production API is https://tgm-student-portal-backend.vercel.app/api/; the frontend proxies it successfully. The local-to-Neon merge is verified: 20 courses, 4 events, 243 students, 243 inquiries and 2 user accounts. Natural keys/references prevent demo duplicates, foreign keys are remapped, and password hashes/account permissions are preserved. Existing cloud records were not overwritten; matching demo timestamps remain as they were online. A private pg_dump archive backs up the pre-transfer cloud database, and the local PostgreSQL source remains unchanged. Sessions were not copied: staff sign in with their existing credentials. Production checks passed for submission, duplicate references, CSRF login, staff sessions and dashboard access; the temporary smoke-test account and inquiry were removed.
+![Architecture diagram: browser, Vercel frontend, Vercel Django API, Neon and release jobs](docs/diagrams/architecture.svg)
 
-## Database design
+The frontend and backend are separate Vercel projects. React/Vite serves the two portals; Django REST Framework handles validation, search, inquiries and analytics. Frontend rewrites forward /api/* and DRF static assets to the backend while the browser keeps one origin. Staff sessions therefore work without cross-site cookie exceptions.
 
-This workspace uses local PostgreSQL (`tgm_studentportal`); SQLite remains available for isolated browser tests and as a migration backup. Production uses hosted PostgreSQL through `POSTGRES_URL`, with `DATABASE_URL` accepted for Marketplace integrations. Production settings refuse to start without a secret and a PostgreSQL connection string. Vercel cannot use `localhost:5433` on the developer's laptop. Use Neon's pooled TLS connection for runtime traffic; server-side cursors are disabled and persistent Django connections are disabled on Vercel. Production database provisioning requires an authorized Neon account or Vercel Marketplace installation; no cloud database is implied by the local PostgreSQL migration.
+Django runs through config.wsgi.application. Runtime database traffic uses Neon's pooled TLS connection, with persistent Django connections and server-side cursors disabled on Vercel. Release/transfer jobs use hosted credentials; transfers can use the direct endpoint. Browsers never receive database credentials.
 
-| Entity     | Responsibility and relationships                                                                                                                                                            |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Student    | Canonical identity with case-insensitively unique email and latest name, phone and location; one student has many inquiries.                                                                |
-| Inquiry    | Exactly one protected student, course and event relationship; reference, intake, destination, status, notes and submission timestamp. Contact details are retained as submission snapshots. |
-| Course     | Name, level, current tuition in NGN, intakes, study location and active flag. Deactivation preserves history.                                                                               |
-| Event      | Name, city, venue, date, time and capacity. Events with linked inquiries cannot be deleted.                                                                                                 |
-| Admin user | Django's auth user, with hashed passwords and session authentication; never a plaintext-password table.                                                                                     |
+The repositories are [backend](https://github.com/EdetDavid/tgm_education_student_portal) and [frontend](https://github.com/EdetDavid/tgm_student_portal_frontend). Each standalone repository uses an empty Vercel Root Directory. Run migrations deliberately with scripts/release.py, not inside requests. Keep schema changes compatible with the previous deployment so code can be rolled back safely. Separate staging databases and automated CI checks are follow-ups, not features claimed by this build.
 
-Snapshot contact details explain what the student submitted at that time; later contact changes do not silently rewrite old inquiries. Course names and prices are deliberately read from the related course, so staff edits propagate everywhere. Potential revenue is current tuition multiplied by matching inquiries, not money received. Course analytics group by course ID so two courses with the same name are not merged.
+## Data model
 
-Duplicate handling normalizes email and reuses the reference for the same student/course/event within a rolling 24-hour window. PostgreSQL locks the student row inside the create transaction before checking for a duplicate, serializing concurrent submissions for that student. Different courses/events remain separate inquiries; a submission after the window is new. SQLite does not provide equivalent row locking and is not the production concurrency target.
+![Class diagram showing the main fields and the three one-to-many inquiry relationships](docs/diagrams/class.svg)
 
-## Search and indexing
+Each inquiry belongs to exactly one Student, Course and Event. Course selection is independent of study choice: the student selects a course, programme type, intake, destination country and destination city separately. Protected foreign keys keep referenced records from being deleted accidentally. Tuition and revenue estimates use NGN.
 
-Both student course search and staff inquiry search run against the database. Staff searches use case-insensitive substring matches on name, email, phone and reference. Filters, dashboard aggregates and CSV export share one validated query builder. Pagination is deterministic, with an ID tie-breaker.
+Student email is unique regardless of case. Inquiry reference is unique. Django User stores hashed passwords and staff flags; it is not the student contact record. There is no per-inquiry staff owner or audit-user foreign key in this build.
 
-The schema has a unique reference index, a case-insensitive email uniqueness constraint, a student/course/event/date index for duplicate checks, and indexes for recent records, status/date, course/date, event/date, intake and destination. Foreign keys also receive indexes. Ordinary B-tree indexes do not solve arbitrary substring searches: PostgreSQL migrations add `pg_trgm` GIN indexes on the `UPPER(...)` expressions used by Django's `icontains` queries, including student location and course fields. SQLite uses database scans for this small demo. Inspect production query plans before adding more indexes, since indexes consume storage and slow writes. [PostgreSQL trigram index support](https://www.postgresql.org/docs/17/pgtrgm.html#PGTRGM-INDEX).
+## Use cases
 
-Use Neon's pooled endpoint for application traffic and its direct endpoint for administrative/migration jobs when appropriate. Configure a restore window that meets the agreed recovery objective, keep separate encrypted exports, and perform a restore drill before the exhibition. Do not assume a provider plan's default retention is sufficient. [Neon pooling](https://neon.com/blog/pgbouncer-the-one-with-prepared-statements), [Neon branch restore](https://neon.com/blog/announcing-point-in-time-restore).
+![UML use case diagram showing student actions and authenticated staff actions](docs/diagrams/use-case.svg)
 
-## Security and role-based access
+Students search courses, choose a programme type and study destination, choose an event and submit interest without an account. Staff sign in to manage courses/events, search inquiries, update status and notes, read reports and export the filtered view. Current staff sessions expose Super Admin or Admin; the onboarding panel appears after each successful login. Counsellor and Student are defined as planned roles for a fuller authenticated user portal, not as separate permissions in this build.
 
-The implemented build requires staff authentication for every admin endpoint, not just the frontend route. Session-authenticated writes require CSRF, passwords use Django hashing, production cookies are Secure/HttpOnly where applicable, hosts/origins are explicit, and ORM queries avoid interpolating user-supplied SQL. React escapes ordinary text; CSV export escapes formula-like values. Student-facing endpoints cannot list private inquiries. Validate inputs on both sides, but always treat server validation as authoritative.
+Reports include inquiry totals and trends, course demand, intake, location, destination, event capacity, status and potential revenue. Bar/pie charts respond to the same filters as the inquiry table and CSV. Potential revenue means matching inquiry count × current tuition, not income already collected.
 
-Before going live I would add provider/WAF login and submission rate limits, staff MFA/SSO, an append-only audit trail for sensitive actions, and centralized error/latency monitoring without student details in logs. Restrict database credentials to the application's database, rotate secrets, use TLS on both network legs, and never put secrets in `VITE_*` variables. Agree retention/deletion rules for contact information and expired sessions, restrict CSV access, and review permissions regularly.
+## Submission flow
 
-The build currently has one staff role; multiple roles are an optional extension. I would use Django Groups/Permissions enforced by DRF for this separation:
+![Activity diagram with client/server validation, transaction locking and duplicate-reference handling](docs/diagrams/activity.svg)
 
-| Role              | Allowed access                                                                               |
-| ----------------- | -------------------------------------------------------------------------------------------- |
-| Public student    | Read active courses/upcoming events; submit interest; no access to existing student records. |
-| Support staff     | Read assigned inquiries and update status/notes; no catalogue changes or bulk exports.       |
-| Catalogue manager | Manage courses/events and review demand; no user administration.                             |
-| Analyst           | Aggregated analytics, without unnecessary contact details.                                   |
-| Administrator     | Assign roles, approve exports and administer the platform.                                   |
+Both sides validate the form. The server checks the active course, available intake and upcoming event. It normalizes email and locks the student row inside a PostgreSQL transaction before checking for a repeat. The same student/course/event within 24 hours gets the existing reference; another course/event or a later submission creates a new inquiry. Field errors return HTTP 400, a new inquiry returns 201, and a duplicate returns 200 with its original reference.
 
-Hide unavailable controls for usability, but enforce these permissions at every API endpoint and queryset. Deny access by default. Add role-specific tests before enabling the proposed roles.
+## Search and security
+
+Search runs in PostgreSQL, not just in the browser. Staff searches accept partial names, emails, phones and references. A shared, validated query builder drives filters, pagination, dashboard totals and export. Pagination has an ID tie-breaker.
+
+B-tree indexes cover foreign keys, recent records and common filters. The duplicate check has a student/course/event/date index. pg_trgm GIN indexes on UPPER(search fields) support Django's case-insensitive substring queries. Add further indexes only when measured query plans justify their storage and write cost.
+
+Every admin endpoint checks an active staff session; writes require CSRF. Production uses secure cookies, explicit hosts/origins and private/no-store API responses. ORM queries avoid interpolated SQL, React escapes ordinary text, and CSV export handles formula-like values. Public endpoints do not list student inquiries.
+
+Before handling real exhibition data, add login/submission rate limits, staff MFA/SSO, an audit trail and monitoring without contact details in logs. Agree retention and restore targets. Support staff, catalogue manager, analyst and administrator groups are a possible extension, not separate permissions currently implemented.
+
+## Recovery and checks
+
+The local-to-Neon transfer took a private pg_dump backup first, remapped foreign keys and verified the merge before committing. Existing cloud records were not overwritten; matching demo timestamps stayed as they were online. Backups contain contact details/password hashes and are excluded from Git and Vercel uploads. Restore into a separate database and test recovery before real event use.
+
+Production checks passed for catalog access, submission, duplicate references, CSRF-protected login, staff sessions and dashboard access. Temporary smoke-test records were removed. Recheck the full student/admin flow after a release; review Django deployment warnings rather than assuming a successful build proves production readiness.
+
+The diagram sources are in docs/diagrams: Mermaid for architecture, classes and activity; PlantUML for use cases. SVGs are embedded here, with PNGs used in the Word document. PowerShell rendering scripts are in docs.
+
+References: [Vercel Django](https://vercel.com/docs/frameworks/full-stack/django), [Django deployment checklist](https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/), [PostgreSQL trigram indexes](https://www.postgresql.org/docs/17/pgtrgm.html#PGTRGM-INDEX).

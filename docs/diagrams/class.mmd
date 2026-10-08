@@ -1,0 +1,59 @@
+classDiagram
+    class Student {
+        id: PK
+        email: case-insensitive unique
+        full_name: string
+        phone: string
+        location: string
+        created_at: datetime
+        updated_at: datetime
+    }
+    class Course {
+        id: PK
+        name: string
+        level: string
+        price: Decimal_NGN
+        location: string
+        intakes: JSON
+        active: boolean
+    }
+    class Event {
+        id: PK
+        name: string
+        city: string
+        venue: string
+        date: date
+        time: time
+        capacity: positive_integer
+    }
+    class Inquiry {
+        id: PK
+        student_id: FK
+        course_id: FK
+        event_id: FK
+        reference: unique
+        full_name: string
+        email: string
+        phone: string
+        intake: string
+        destination: string
+        student_location: string
+        message: text
+        status: New_Contacted_Converted_Closed
+        internal_notes: text
+        created_at: datetime
+    }
+    class User {
+        id: PK
+        username: unique
+        password: hashed
+        is_staff: boolean
+        is_superuser: boolean
+        is_active: boolean
+        groups: many_to_many
+        user_permissions: many_to_many
+    }
+    Student "1" -- "0..*" Inquiry
+    Course "1" -- "0..*" Inquiry
+    Event "1" -- "0..*" Inquiry
+    note for User "Django auth user. Staff access is checked at the API; no inquiry-owner FK."

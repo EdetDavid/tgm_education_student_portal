@@ -2,7 +2,10 @@ import csv
 import uuid
 from datetime import timedelta
 
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, login, logout, get_user_model
+from django.contrib.auth.hashers import make_password, check_password
+from django.contrib.auth.models import Group
+from django.conf import settings
 from django.db import transaction
 from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import TruncDate
@@ -20,12 +23,12 @@ from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
 
-from .models import Course, Event, Inquiry, Student
+from .models import Course, Event, Inquiry, Student, StaffProfile, PortalAccessCode
 from .queries import filtered_inquiries
 from .csv_export import spreadsheet_safe
 from .serializers import (AdminInquirySerializer, AdminInquiryUpdateSerializer, AdminInquiryListUpdateSerializer,
                           AdminLoginSerializer, CourseSerializer, EventSerializer,
-                          PublicCourseSerializer, StudentInquiryCreateSerializer)
+                          PublicCourseSerializer, StudentInquiryCreateSerializer, StaffSignupSerializer)
 
 
 # create views
@@ -145,10 +148,68 @@ class AdminLogin(generics.GenericAPIView):
         serializer.is_valid(raise_exception=True)
         user = authenticate(request, username=serializer.validated_data['username'],
                             password=serializer.validated_data['password'])
-        if not user or not user.is_staff:
+        requested_role = serializer.validated_data['role']
+        valid_role = bool(user)
+        if requested_role == 'Super Admin':
+            valid_role = valid_role and user.is_superuser
+        elif requested_role == 'Admin':
+            valid_role = valid_role and user.is_staff and not user.is_superuser and not user.groups.filter(name='Counsellor').exists()
+        elif requested_role == 'Counsellor':
+            valid_role = valid_role and user.is_staff and user.groups.filter(name='Counsellor').exists()
+        else:
+            valid_role = valid_role and not user.is_staff
+        if not valid_role:
             return Response({'error': 'Username or password is incorrect, or this account is not an admin.'}, status=status.HTTP_401_UNAUTHORIZED)
         login(request, user)
-        return Response({'username': user.get_username()})
+        return Response({'username': user.get_username(), 'role': requested_role, 'full_name': user.first_name, 'email': user.email})
+
+
+class StaffSignup(generics.GenericAPIView):
+    permission_classes = [permissions.AllowAny]
+    serializer_class = StaffSignupSerializer
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        values = serializer.validated_data
+        role = values['role']
+        if role == 'Student':
+            if not values.get('email') or not values.get('full_name'):
+                return Response({'error': 'Full name and email are required for a student account.'}, status=400)
+            User = get_user_model()
+            if User.objects.filter(username=values['username']).exists() or User.objects.filter(email__iexact=values['email']).exists():
+                return Response({'error': 'That username or email is already registered.'}, status=400)
+            user = User.objects.create_user(values['username'], email=values['email'], password=values['password'], first_name=values['full_name'])
+            login(request, user)
+            return Response({'username': user.get_username(), 'role': role, 'full_name': user.first_name, 'email': user.email}, status=201)
+        if get_user_model().objects.filter(username=values['username']).exists():
+            return Response({'error': 'That username is already in use.'}, status=400)
+        if role in ('Admin', 'Counsellor'):
+            expected = getattr(settings, 'PORTAL_ORGANISATION_CODE', '')
+            if not expected or values.get('organisation_code') != expected or not values.get('staff_id'):
+                return Response({'error': 'A valid staff ID and organisation code are required.'}, status=403)
+        else:
+            expected = getattr(settings, 'SUPER_ADMIN_ACCESS_CODE', '')
+            saved = PortalAccessCode.objects.filter(name='super_admin').first()
+            valid_access = check_password(values.get('access_code', ''), saved.code_hash) if saved else values.get('access_code') == expected
+            if not valid_access:
+                return Response({'error': 'The Super Admin access code is incorrect.'}, status=403)
+        User = get_user_model()
+        user = User.objects.create_user(values['username'], password=values['password'])
+        if role == 'Super Admin':
+            user.is_staff = True
+            user.is_superuser = True
+            user.save(update_fields=['is_staff', 'is_superuser'])
+        else:
+            user.is_staff = True
+            user.save(update_fields=['is_staff'])
+            if role == 'Counsellor':
+                group, _ = Group.objects.get_or_create(name='Counsellor')
+                user.groups.add(group)
+            StaffProfile.objects.create(user=user, role=role, staff_id=values['staff_id'],
+                                        organisation_code_hash=make_password(values['organisation_code']))
+        login(request, user)
+        return Response({'username': user.get_username(), 'role': role}, status=201)
 
 
 class StaffAPIView(generics.GenericAPIView):
@@ -164,7 +225,52 @@ class AdminLogout(StaffAPIView):
 
 class AdminMe(StaffAPIView):
     def get(self, request):
-        return Response({'username': request.user.get_username()})
+        if request.user.is_superuser:
+            role = 'Super Admin'
+        elif request.user.groups.filter(name='Counsellor').exists():
+            role = 'Counsellor'
+        else:
+            role = 'Admin'
+        return Response({'username': request.user.get_username(), 'role': role,
+                         'onboarding': {'title': 'Welcome to Student Portal',
+                         'message': 'Use the workspace to review student interest, manage the course catalogue and check event demand.'}})
+
+
+class SuperAdminAccessCode(StaffAPIView):
+    def post(self, request):
+        if not request.user.is_superuser:
+            return Response({'error': 'Super Admin access required.'}, status=403)
+        code = str(request.data.get('access_code', '')).strip()
+        if len(code) < 8:
+            return Response({'error': 'The access code must be at least 8 characters.'}, status=400)
+        item, _ = PortalAccessCode.objects.get_or_create(name='super_admin')
+        item.code_hash = make_password(code)
+        item.save(update_fields=['code_hash', 'updated_at'])
+        return Response({'ok': True})
+
+
+class SuperAdminAPIView(StaffAPIView):
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        if not request.user.is_superuser:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Super Admin access required.')
+
+
+class AdminUserManagement(SuperAdminAPIView):
+    def get(self, request):
+        users = get_user_model().objects.prefetch_related('groups').order_by('username')
+        return Response({'users': [{'id': user.id, 'username': user.username, 'email': user.email,
+                                    'role': 'Super Admin' if user.is_superuser else ('Counsellor' if user.groups.filter(name='Counsellor').exists() else ('Admin' if user.is_staff else 'Student')),
+                                    'active': user.is_active, 'date_joined': user.date_joined.isoformat()} for user in users]})
+
+
+class AdminStudentList(StaffAPIView):
+    def get(self, request):
+        students = Student.objects.order_by('-created_at')
+        return Response({'students': [{'id': student.id, 'full_name': student.full_name, 'email': student.email,
+                                       'phone': student.phone, 'location': student.location,
+                                       'inquiries': student.inquiries.count(), 'created_at': student.created_at.isoformat()} for student in students]})
 
 
 class AdminDashboard(StaffAPIView):
@@ -214,10 +320,10 @@ class AdminInquiryList(StaffAPIView):
             response['Content-Disposition'] = 'attachment; filename="student-inquiries.csv"'
             writer = csv.writer(response)
             writer.writerow(['Reference', 'Name', 'Email', 'Phone', 'Course',
-                            'Intake', 'Destination', 'Location', 'Event', 'Status', 'Date'])
+                            'Programme type', 'Intake', 'Destination country', 'Destination city', 'Student location', 'Event', 'Status', 'Date'])
             for item in qs:
                 writer.writerow(map(spreadsheet_safe, [item.reference, item.full_name, item.email, item.phone, item.course.name,
-                                                       item.intake, item.destination, item.student_location, item.event.name,
+                                                       item.programme_type, item.intake, item.destination, item.destination_city, item.student_location, item.event.name,
                                                        item.status, item.created_at.isoformat()]))
             return response
         paginator = InquiryPagination()

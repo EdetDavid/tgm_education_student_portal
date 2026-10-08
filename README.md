@@ -2,6 +2,10 @@
 
 Django REST Framework backend for TGM Education's Student Portal. Frontend: https://tgm-student-portal-frontend.vercel.app/.
 Production API: https://tgm-student-portal-backend.vercel.app/api/.
+
+Live links: [Student portal](https://tgm-student-portal-frontend.vercel.app/), [Admin portal](https://tgm-student-portal-frontend.vercel.app/admin/), [Backend](https://tgm-student-portal-backend.vercel.app/), [API root](https://tgm-student-portal-backend.vercel.app/api/). Use /api/ rather than the bare backend root. Public endpoints: [courses](https://tgm-student-portal-backend.vercel.app/api/courses/), [events](https://tgm-student-portal-backend.vercel.app/api/events/), [inquiry submission](https://tgm-student-portal-backend.vercel.app/api/inquiries/). [DRF browser login](https://tgm-student-portal-backend.vercel.app/api/auth/login/) is available for staff.
+
+[ARCHITECTURE.md](ARCHITECTURE.md) includes architecture, class, use case and activity diagrams. Editable sources and rendered SVG/PNG assets are in [docs/diagrams](docs/diagrams). The diagrams show the implemented build, not the proposed specialist staff roles.
 Production smoke checks passed; the temporary test account was removed. Local records and both user accounts have now been merged into Neon with password hashes and permissions preserved. Use your existing staff login. Current cloud totals: 20 courses, 4 events, 243 students and 243 inquiries. Browser sessions were intentionally not transferred.
 
 ## Local setup (PowerShell)
