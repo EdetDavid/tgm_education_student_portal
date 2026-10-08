@@ -12,7 +12,7 @@ Put Neon PostgreSQL in a region close to the API, use separate production/stagin
 
 ## Verified deployment status
 
-The production API is https://tgm-student-portal-backend.vercel.app/api/; the frontend proxies it successfully. Neon has 20 sample courses, 3 events and 240 synthetic inquiries. Production smoke checks passed for catalog access, submission, duplicate references, CSRF-protected staff login, session persistence across requests and dashboard access. The check removed only its temporary account, session and inquiry. A permanent production admin still needs creating (or explicit approval to copy the existing local staff login); local credentials were not transferred. Local PostgreSQL data was not changed by this cloud release.
+The production API is https://tgm-student-portal-backend.vercel.app/api/; the frontend proxies it successfully. The local-to-Neon merge is verified: 20 courses, 4 events, 243 students, 243 inquiries and 2 user accounts. Natural keys/references prevent demo duplicates, foreign keys are remapped, and password hashes/account permissions are preserved. Existing cloud records were not overwritten; matching demo timestamps remain as they were online. A private pg_dump archive backs up the pre-transfer cloud database, and the local PostgreSQL source remains unchanged. Sessions were not copied: staff sign in with their existing credentials. Production checks passed for submission, duplicate references, CSRF login, staff sessions and dashboard access; the temporary smoke-test account and inquiry were removed.
 
 ## Database design
 

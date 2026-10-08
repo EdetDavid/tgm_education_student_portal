@@ -2,7 +2,7 @@
 
 Django REST Framework backend for TGM Education's Student Portal. Frontend: https://tgm-student-portal-frontend.vercel.app/.
 Production API: https://tgm-student-portal-backend.vercel.app/api/.
-Production smoke checks passed; the temporary test account was removed. To create a permanent production admin, run `.\.venv\Scripts\python.exe scripts/release.py --env-file .env.vercel --create-admin`. Existing local staff credentials have not been copied.
+Production smoke checks passed; the temporary test account was removed. Local records and both user accounts have now been merged into Neon with password hashes and permissions preserved. Use your existing staff login. Current cloud totals: 20 courses, 4 events, 243 students and 243 inquiries. Browser sessions were intentionally not transferred.
 
 ## Local setup (PowerShell)
 
@@ -70,7 +70,13 @@ Deploy frontend/vercel.json from the frontend repository; it proxies /api/* and 
 
 Verify backend /api/, /api/courses/, /api/events/ and /static/rest_framework/css/bootstrap.min.css; then verify frontend search, submission/duplicate reference, staff login, reports and CSV. Anonymous admin requests must be denied. Project creation alone is not deployment; confirm the assigned URL and persistence after redeployment.
 
-## Tests
+## Local-to-Neon transfer
+
+`scripts/transfer_to_neon.py` reads local tgm_studentportal from .env and the connected Neon database from the ignored .env.vercel profile. By default it only audits; --apply performs the transfer after a custom-format pg_dump backup and private local-record snapshot in backups/. Keep those files private: they contain contact details/password hashes and are excluded from Git and Vercel uploads.
+
+The merge matches courses/events by descriptive natural keys, students by normalized email, inquiries by reference and accounts by username. IDs are remapped for foreign keys; existing cloud rows are never overwritten or deleted. Overlapping demo records retain their cloud timestamps; new records preserve local timestamps. Conflicting field values abort before writing. Hashed passwords, account flags, groups and permissions are copied; active browser sessions are not. A locked transaction rechecks concurrent changes and verifies imported values before commit. Local PostgreSQL is read-only throughout. Re-running audit after the completed transfer reports no additional records to import. Restore the .dump into a separate empty PostgreSQL database with pg_restore if recovery is needed; do not blindly restore over live data.
+
+## Automated tests
 
 ```powershell
 .\.venv\Scripts\python.exe manage.py test portal.tests
