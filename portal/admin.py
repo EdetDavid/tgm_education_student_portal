@@ -3,6 +3,13 @@ from django.contrib import admin
 from .models import Course, CourseOffering, Event, Inquiry, PortalAccessCode, StaffProfile, Student, University
 
 
+class CourseOfferingInline(admin.TabularInline):
+    model = CourseOffering
+    extra = 1
+    autocomplete_fields = ('university',)
+    fields = ('university', 'region', 'institution', 'country', 'city', 'price', 'active')
+
+
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
     list_display = ('name', 'level', 'price', 'location', 'active', 'intakes_display')
@@ -10,6 +17,7 @@ class CourseAdmin(admin.ModelAdmin):
     search_fields = ('name', 'level', 'location')
     list_editable = ('active',)
     ordering = ('name',)
+    inlines = (CourseOfferingInline,)
 
     @admin.display(description='Available intakes')
     def intakes_display(self, obj):
@@ -18,9 +26,10 @@ class CourseAdmin(admin.ModelAdmin):
 
 @admin.register(CourseOffering)
 class CourseOfferingAdmin(admin.ModelAdmin):
-    list_display = ('course', 'region', 'institution', 'country', 'city', 'active')
+    list_display = ('course', 'university', 'region', 'city', 'price', 'active')
     list_filter = ('region', 'country', 'active')
-    search_fields = ('course__name', 'institution', 'country', 'city')
+    search_fields = ('course__name', 'institution', 'university__name', 'country', 'city')
+    autocomplete_fields = ('course', 'university')
     list_editable = ('active',)
     ordering = ('course__name', 'region', 'institution')
 
@@ -31,6 +40,7 @@ class UniversityAdmin(admin.ModelAdmin):
     list_filter = ('country', 'active')
     search_fields = ('name', 'country', 'city')
     list_editable = ('active',)
+    ordering = ('name',)
 
 
 @admin.register(Event)
@@ -52,17 +62,23 @@ class StudentAdmin(admin.ModelAdmin):
 
 @admin.register(Inquiry)
 class InquiryAdmin(admin.ModelAdmin):
-    list_display = ('reference', 'full_name', 'course', 'programme_type', 'destination_summary', 'event', 'status', 'created_at')
-    list_filter = ('status', 'programme_type', 'intake', 'destination', 'event', 'course')
-    search_fields = ('reference', 'full_name', 'email', 'phone', 'student__email', 'student__full_name')
+    list_display = ('reference', 'full_name', 'course', 'university_summary', 'programme_type', 'destination_summary', 'event', 'status', 'created_at')
+    list_filter = ('status', 'programme_type', 'intake', 'destination', 'event', 'course', 'course_offering__university')
+    search_fields = ('reference', 'full_name', 'email', 'phone', 'student__email', 'student__full_name', 'course_offering__university__name')
     readonly_fields = ('reference', 'created_at')
-    raw_id_fields = ('student', 'course', 'event')
+    raw_id_fields = ('student', 'course', 'course_offering', 'event')
     date_hierarchy = 'created_at'
     ordering = ('-created_at',)
 
     @admin.display(description='Study destination')
     def destination_summary(self, obj):
         return f'{obj.destination_city}, {obj.destination}' if obj.destination_city else obj.destination
+
+    @admin.display(description='Selected university')
+    def university_summary(self, obj):
+        if not obj.course_offering:
+            return '—'
+        return obj.course_offering.university or obj.course_offering.institution
 
 
 @admin.register(StaffProfile)
