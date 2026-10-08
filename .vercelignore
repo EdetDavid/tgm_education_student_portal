@@ -1,0 +1,14 @@
+.git/
+.agents/
+skills-lock.json
+.venv/
+venv/
+env/
+.env
+.env.*
+db.sqlite3*
+backups/
+staticfiles/
+media/
+**/__pycache__/
+**/*.pyc
