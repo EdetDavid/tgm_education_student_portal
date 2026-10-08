@@ -65,3 +65,6 @@ Production checks passed for catalog access, submission, duplicate references, C
 The diagram sources are in docs/diagrams: Mermaid for architecture, classes and activity; PlantUML for use cases. SVGs are embedded here, with PNGs used in the Word document. PowerShell rendering scripts are in docs.
 
 References: [Vercel Django](https://vercel.com/docs/frameworks/full-stack/django), [Django deployment checklist](https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/), [PostgreSQL trigram indexes](https://www.postgresql.org/docs/17/pgtrgm.html#PGTRGM-INDEX).
+## Course catalogue structure
+
+Courses are independent from the student's chosen destination and programme type. Each course now has five active catalogue offerings across Africa, Asia, Europe, North America and Oceania. An offering records its partner university, country and city; the student still selects their own destination separately when applying.

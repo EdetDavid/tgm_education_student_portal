@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Course, Event, Inquiry, PortalAccessCode, StaffProfile, Student
+from .models import Course, CourseOffering, Event, Inquiry, PortalAccessCode, StaffProfile, Student
 
 
 @admin.register(Course)
@@ -14,6 +14,15 @@ class CourseAdmin(admin.ModelAdmin):
     @admin.display(description='Available intakes')
     def intakes_display(self, obj):
         return ', '.join(obj.intakes or [])
+
+
+@admin.register(CourseOffering)
+class CourseOfferingAdmin(admin.ModelAdmin):
+    list_display = ('course', 'region', 'institution', 'country', 'city', 'active')
+    list_filter = ('region', 'country', 'active')
+    search_fields = ('course__name', 'institution', 'country', 'city')
+    list_editable = ('active',)
+    ordering = ('course__name', 'region', 'institution')
 
 
 @admin.register(Event)

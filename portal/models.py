@@ -49,6 +49,19 @@ class Course(models.Model):
         self.price), 'location': self.location, 'intakes': self.intakes}
 
 
+class CourseOffering(models.Model):
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='offerings')
+    region = models.CharField(max_length=80)
+    institution = models.CharField(max_length=160)
+    country = models.CharField(max_length=100)
+    city = models.CharField(max_length=100)
+    active = models.BooleanField(default=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['course', 'institution', 'city'], name='course_offering_unique')]
+        ordering = ['region', 'country', 'institution']
+
+
 class Event(models.Model):
     name = models.CharField(max_length=160)
     city = models.CharField(max_length=80)

@@ -5,7 +5,7 @@ from decimal import Decimal
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import Course, Event, Inquiry, StaffProfile
+from .models import Course, Event, Inquiry, StaffProfile, CourseOffering
 from .intakes import available_intakes
 
 # create serializers 
@@ -30,14 +30,19 @@ class CourseSerializer(serializers.ModelSerializer):
 
 class PublicCourseSerializer(serializers.ModelSerializer):
     intake_options = serializers.SerializerMethodField()
+    offerings = serializers.SerializerMethodField()
 
     def get_intake_options(self, course):
         return available_intakes(course.intakes)
 
+    def get_offerings(self, course):
+        return [{'region': item.region, 'institution': item.institution, 'country': item.country, 'city': item.city}
+                for item in course.offerings.filter(active=True)]
+
     class Meta:
         model = Course
         fields = ['id', 'name', 'institution', 'region', 'study_country', 'study_city', 'level', 'price',
-                  'location', 'intakes', 'intake_options']
+                  'location', 'intakes', 'intake_options', 'offerings']
 
 
 class EventSerializer(serializers.ModelSerializer):
