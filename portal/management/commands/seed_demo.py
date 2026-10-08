@@ -2,6 +2,7 @@ from datetime import time, timedelta
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.db.models.functions import Lower
 from django.utils import timezone
 
 from portal.intakes import available_intakes
@@ -52,24 +53,29 @@ class Command(BaseCommand):
                 'time': time(10, 0), 'capacity': 120,
             })
             events.append(event)
-        created = 0
+        existing_references = set(Inquiry.objects.filter(
+            reference__startswith='DEMO-').values_list('reference', flat=True))
+        emails = [f'student{index + 1:04d}@example.com' for index in range(count)]
+        students = {student.email.lower(): student for student in
+                    Student.objects.annotate(email_key=Lower('email')).filter(email_key__in=emails)}
+        new_students = []
+        rows = []
         for index in range(count):
             reference = f'DEMO-{index + 1:06d}'
-            if Inquiry.objects.filter(reference=reference).exists():
+            if reference in existing_references:
                 continue
             course = courses[index % len(courses)]
             email = f'student{index + 1:04d}@example.com'
             full_name = f'{FIRST_NAMES[index % len(FIRST_NAMES)]} {LAST_NAMES[(index // len(FIRST_NAMES)) % len(LAST_NAMES)]}'
             phone = f'+234 80{index + 10000000:08d}'
             location = LOCATIONS[index % len(LOCATIONS)]
-            student, _ = Student.objects.get_or_create(email=email, defaults={
-                'full_name': full_name, 'phone': phone, 'location': location,
-            })
+            if email not in students:
+                new_students.append(Student(email=email, full_name=full_name, phone=phone, location=location))
             intakes = available_intakes(course.intakes)
             if not intakes:
                 raise CommandError(f'{course.name} has no valid intakes; add one before seeding.')
-            inquiry = Inquiry.objects.create(
-                student=student, full_name=full_name, email=email, phone=phone, course=course,
+            inquiry = Inquiry(
+                full_name=full_name, email=email, phone=phone, course=course,
                 intake=intakes[(index // len(courses)) % len(intakes)],
                 destination=DESTINATIONS[(index // 3) % len(DESTINATIONS)],
                 student_location=location, event=events[index % len(events)],
@@ -78,9 +84,20 @@ class Command(BaseCommand):
                 internal_notes='Sample record for the assessment demo.',
             )
             # Spread activity across 60 days so the timeline is useful, not a single bar.
-            Inquiry.objects.filter(pk=inquiry.pk).update(
-                created_at=timezone.now() - timedelta(days=index % 60, hours=index % 12))
-            created += 1
+            rows.append((inquiry, timezone.now() - timedelta(days=index % 60, hours=index % 12)))
+        # Keep a cloud seed to a few batches rather than thousands of network
+        # round trips inside a long-lived transaction.
+        Student.objects.bulk_create(new_students, batch_size=500)
+        students = {student.email.lower(): student for student in
+                    Student.objects.annotate(email_key=Lower('email')).filter(email_key__in=emails)}
+        inquiries = [row[0] for row in rows]
+        for inquiry in inquiries:
+            inquiry.student = students[inquiry.email]
+        Inquiry.objects.bulk_create(inquiries, batch_size=500)
+        for inquiry, submitted_at in rows:
+            inquiry.created_at = submitted_at
+        Inquiry.objects.bulk_update(inquiries, ['created_at'], batch_size=500)
+        created = len(inquiries)
         self.stdout.write(self.style.SUCCESS(
             f'Demo ready: {Course.objects.count()} courses, {Event.objects.count()} events, '
             f'{Inquiry.objects.count()} inquiries ({created} sample inquiries added). Existing records preserved.'))
