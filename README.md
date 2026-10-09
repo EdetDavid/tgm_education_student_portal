@@ -89,3 +89,6 @@ The merge matches courses/events by descriptive natural keys, students by normal
 Django uses a separate test database and removes it afterward. PostgreSQL test users need permission to create a test database. Do not point tests at production. Frontend unit and browser tests live in the frontend repository.
 
 Optional production smoke check (Node.js 24+ required): `.\.venv\Scripts\python.exe scripts/smoke_production.py`. It uses the ignored cloud profile, creates a temporary staff account and synthetic submission, verifies duplicate handling and authenticated frontend proxy access, then deletes only its own account, session and inquiry. This is a mutating check; run intentionally, not as a passive monitoring job.
+## CI/CD
+
+GitHub Actions runs `.github/workflows/ci.yml` for pull requests and pushes to `main`. It installs Python dependencies, checks for missing migrations, runs Django's system check, and runs `portal.tests` using the CI SQLite database. Vercel's GitHub integration handles preview deployments for pull requests and production deployments from `main`. Production database migrations remain an explicit release step using `scripts/release.py --env-file .env.vercel`; CI never connects to or migrates production data.
