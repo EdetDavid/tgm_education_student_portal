@@ -3,6 +3,7 @@ from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
+from .hosts import allowed_hosts
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -37,10 +38,7 @@ if not DEBUG and (
         'SQLite is development-only.'
     )
 
-ALLOWED_HOSTS = os.environ.get(
-    'DJANGO_ALLOWED_HOSTS',
-    'localhost,127.0.0.1',
-).split(',')
+ALLOWED_HOSTS = allowed_hosts(os.environ)
 
 
 # Application definition

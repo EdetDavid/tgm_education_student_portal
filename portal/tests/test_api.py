@@ -256,6 +256,22 @@ class PortalApiTests(TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(Event.objects.count(), 2)
 
+    def test_super_admin_can_edit_full_course_and_record_audit_event(self):
+        user = get_user_model().objects.create_superuser(
+            username='course-super-admin', password='TestOnly934!', email='super@example.com')
+        self.client.force_login(user)
+        payload = {'name': 'Updated Computer Science', 'institution': 'Test University',
+                   'region': 'Europe', 'study_country': 'United Kingdom', 'study_city': 'Leeds',
+                   'location': 'Leeds', 'level': 'Postgraduate', 'price': '25000.00',
+                   'intakes': ['January', 'September'], 'active': True}
+        response = self.client.patch(f'/api/admin/courses/{self.course.pk}/', payload,
+                                     format='json', HTTP_X_CSRFTOKEN=self.csrf())
+        self.assertEqual(response.status_code, 200, response.data)
+        self.course.refresh_from_db()
+        self.assertEqual(self.course.study_city, 'Leeds')
+        self.assertEqual(self.course.intakes, ['January', 'September'])
+        self.assertTrue(ActivityLog.objects.filter(action='course.updated', entity_id=str(self.course.pk)).exists())
+
     def test_api_root_and_public_request_forms_are_browsable(self):
         root = self.client.get('/api/')
         self.assertEqual(root.status_code, 200)
