@@ -15,6 +15,7 @@ def main():
         os.environ['DJANGO_CSRF_TRUSTED_ORIGINS'] = os.environ.get('E2E_FRONTEND_ORIGIN', 'http://127.0.0.1:5174')
         # Empty values override .env so browser tests NEVER select the local PostgreSQL database.
         os.environ['POSTGRES_URL'] = ''
+        os.environ['DATABASE_URL'] = ''
         os.environ['PGDATABASE'] = ''
         import django
         django.setup()
@@ -24,6 +25,7 @@ def main():
         call_command('migrate', verbosity=0)
         call_command('seed_demo')
         get_user_model().objects.create_user(username='e2e-admin', password='E2eOnly934!', is_staff=True)
+        get_user_model().objects.create_superuser(username='e2e-super-admin', password='E2eOnly934!')
         try:
             call_command('runserver', '127.0.0.1:8001', use_reloader=False)
         finally:
