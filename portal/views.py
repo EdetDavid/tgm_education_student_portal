@@ -12,6 +12,7 @@ from django.db.models.functions import TruncDate
 from django.http import HttpResponse, JsonResponse
 from django.middleware.csrf import get_token
 from django.db.models.deletion import ProtectedError
+from django.core.paginator import InvalidPage, Paginator
 from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie, csrf_protect
 from django.utils.decorators import method_decorator
@@ -23,7 +24,9 @@ from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
 
-from .models import Course, Event, Inquiry, Student, StaffProfile, PortalAccessCode, PortalOption, University
+from .models import ActivityLog, Course, Event, Inquiry, Student, StaffProfile, PortalAccessCode, PortalOption, University
+from .activity import record_activity
+from .access_codes import decrypt_access_code, encrypt_access_code
 from .queries import filtered_inquiries
 from .csv_export import spreadsheet_safe
 from .serializers import (AdminInquirySerializer, AdminInquiryUpdateSerializer, AdminInquiryListUpdateSerializer,
@@ -112,6 +115,10 @@ class StudentInquiryCreate(generics.GenericAPIView):
             recent = Inquiry.objects.filter(student=student, course=course, event=event,
                                             created_at__gte=timezone.now() - timedelta(hours=24)).order_by('-created_at').first()
             if recent:
+                record_activity(request, 'inquiry.duplicate_submission', 'Inquiry',
+                                'Repeated student inquiry submission was matched to an existing record.',
+                                entity_id=recent.reference,
+                                details={'reference': recent.reference, 'course': course.name})
                 return Response({'reference': recent.reference, 'duplicate': True}, status=status.HTTP_200_OK)
             student.full_name = values['full_name']
             student.phone = values['phone']
@@ -121,7 +128,42 @@ class StudentInquiryCreate(generics.GenericAPIView):
             reference = f"TGM-{timezone.localdate():%y%m%d}-{uuid.uuid4().hex[:8].upper()}"
             inquiry = Inquiry.objects.create(
                 **{**values, 'student': student, 'email': email, 'reference': reference})
+            record_activity(request, 'inquiry.submitted', 'Inquiry', 'Student interest submitted.',
+                            entity_id=inquiry.reference,
+                            details={'reference': inquiry.reference, 'course': course.name,
+                                     'event': event.name})
         return Response({'reference': inquiry.reference, 'duplicate': False}, status=status.HTTP_201_CREATED)
+
+
+class StudentApplications(APIView):
+    """Return only the signed-in student's own application records."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        if request.user.is_staff or not request.user.email:
+            return Response({'detail': 'Student account required.'}, status=status.HTTP_403_FORBIDDEN)
+        inquiries = Inquiry.objects.filter(email__iexact=request.user.email).select_related(
+            'course', 'event', 'course_offering', 'course_offering__university'
+        ).order_by('-created_at', '-id')
+        return Response({'applications': [{
+            'id': item.pk,
+            'reference': item.reference,
+            'status': item.status,
+            'full_name': item.full_name,
+            'email': item.email,
+            'phone': item.phone,
+            'course': item.course.name,
+            'programme_type': item.programme_type,
+            'intake': item.intake,
+            'destination': item.destination,
+            'destination_city': item.destination_city,
+            'university': (item.course_offering.university.name
+                           if item.course_offering and item.course_offering.university
+                           else item.course_offering.institution if item.course_offering else ''),
+            'event': item.event.name,
+            'message': item.message,
+            'created_at': item.created_at.isoformat(),
+        } for item in inquiries]})
 
 
 class PortalOptions(APIView):
@@ -170,6 +212,8 @@ class AdminLogin(generics.GenericAPIView):
         if not valid_role:
             return Response({'error': 'Username or password is incorrect, or this account is not an admin.'}, status=status.HTTP_401_UNAUTHORIZED)
         login(request, user)
+        record_activity(request, 'auth.login', 'Account', 'User signed in.', actor=user,
+                        details={'role': requested_role})
         return Response({'username': user.get_username(), 'role': requested_role, 'full_name': user.first_name, 'email': user.email})
 
 
@@ -190,6 +234,8 @@ class StaffSignup(generics.GenericAPIView):
                 return Response({'error': 'That username or email is already registered.'}, status=400)
             user = User.objects.create_user(values['username'], email=values['email'], password=values['password'], first_name=values['full_name'])
             login(request, user)
+            record_activity(request, 'account.created', 'Account', 'Student account registered.', actor=user,
+                            details={'role': 'Student'})
             return Response({'username': user.get_username(), 'role': role, 'full_name': user.first_name, 'email': user.email}, status=201)
 
         if get_user_model().objects.filter(username=values['username']).exists():
@@ -222,6 +268,8 @@ class StaffSignup(generics.GenericAPIView):
             StaffProfile.objects.create(user=user, role=role, staff_id=values['staff_id'],
                                         organisation_code_hash=make_password(values['organisation_code']))
         login(request, user)
+        record_activity(request, 'account.created', 'Account', f'{role} account registered.', actor=user,
+                        details={'role': role})
         return Response({'username': user.get_username(), 'role': role}, status=201)
 
 
@@ -246,6 +294,8 @@ class PortalLogout(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
+        if request.user.is_authenticated:
+            record_activity(request, 'auth.logout', 'Account', 'User signed out.')
         logout(request)
         return Response({'ok': True})
 
@@ -262,6 +312,7 @@ class StaffAPIView(generics.GenericAPIView):
 
 class AdminLogout(StaffAPIView):
     def post(self, request):
+        record_activity(request, 'auth.logout', 'Account', 'User signed out.')
         logout(request)
         return Response({'ok': True})
 
@@ -280,6 +331,14 @@ class AdminMe(StaffAPIView):
 
 
 class SuperAdminAccessCode(StaffAPIView):
+    def get(self, request):
+        if not request.user.is_superuser:
+            return Response({'error': 'Super Admin access required.'}, status=403)
+        item = PortalAccessCode.objects.filter(name='super_admin').first()
+        value = (decrypt_access_code(item.code_encrypted) if item and item.code_encrypted else
+                 getattr(settings, 'SUPER_ADMIN_ACCESS_CODE', '') if not item else None)
+        return Response({'access_code': value or '', 'needs_rotation': not value})
+
     def post(self, request):
         if not request.user.is_superuser:
             return Response({'error': 'Super Admin access required.'}, status=403)
@@ -288,11 +347,22 @@ class SuperAdminAccessCode(StaffAPIView):
             return Response({'error': 'The access code must be at least 8 characters.'}, status=400)
         item, _ = PortalAccessCode.objects.get_or_create(name='super_admin')
         item.code_hash = make_password(code)
-        item.save(update_fields=['code_hash', 'updated_at'])
+        item.code_encrypted = encrypt_access_code(code)
+        item.save(update_fields=['code_hash', 'code_encrypted', 'updated_at'])
+        record_activity(request, 'security.access_code_rotated', 'Access code',
+                        'Super Admin access code was changed.')
         return Response({'ok': True})
 
 
 class SuperAdminOrganisationCode(StaffAPIView):
+    def get(self, request):
+        if not request.user.is_superuser:
+            return Response({'error': 'Super Admin access required.'}, status=403)
+        item = PortalAccessCode.objects.filter(name='organisation').first()
+        value = (decrypt_access_code(item.code_encrypted) if item and item.code_encrypted else
+                 getattr(settings, 'PORTAL_ORGANISATION_CODE', '') if not item else None)
+        return Response({'organisation_code': value or '', 'needs_rotation': not value})
+
     def post(self, request):
         if not request.user.is_superuser:
             return Response({'error': 'Super Admin access required.'}, status=403)
@@ -301,7 +371,10 @@ class SuperAdminOrganisationCode(StaffAPIView):
             return Response({'error': 'The organisation code must be at least 8 characters.'}, status=400)
         item, _ = PortalAccessCode.objects.get_or_create(name='organisation')
         item.code_hash = make_password(code)
-        item.save(update_fields=['code_hash', 'updated_at'])
+        item.code_encrypted = encrypt_access_code(code)
+        item.save(update_fields=['code_hash', 'code_encrypted', 'updated_at'])
+        record_activity(request, 'security.organisation_code_rotated', 'Access code',
+                        'Organisation registration code was changed.')
         return Response({'ok': True})
 
 
@@ -319,6 +392,38 @@ class AdminUserManagement(SuperAdminAPIView):
         return Response({'users': [{'id': user.id, 'username': user.username, 'email': user.email,
                                     'role': 'Super Admin' if user.is_superuser else ('Counsellor' if user.groups.filter(name='Counsellor').exists() else ('Admin' if user.is_staff else 'Student')),
                                     'active': user.is_active, 'date_joined': user.date_joined.isoformat()} for user in users]})
+
+
+class AdminActivityFeed(SuperAdminAPIView):
+    def get(self, request):
+        queryset = ActivityLog.objects.all()
+        action = request.query_params.get('action', '').strip()
+        query = request.query_params.get('q', '').strip()
+        if len(query) > 120:
+            raise ValidationError({'q': 'Search must be at most 120 characters.'})
+        if action:
+            queryset = queryset.filter(action=action)
+        if query:
+            queryset = queryset.filter(
+                Q(actor_label__icontains=query) | Q(actor_role__icontains=query) |
+                Q(action__icontains=query) | Q(entity_type__icontains=query) |
+                Q(entity_id__icontains=query) | Q(summary__icontains=query))
+        paginator = Paginator(queryset, 25)
+        try:
+            page_obj = paginator.page(request.query_params.get('page', 1))
+        except (InvalidPage, ValueError):
+            page_obj = paginator.page(paginator.num_pages or 1)
+        return Response({
+            'activities': [{
+                'id': item.id, 'actor': item.actor_label, 'role': item.actor_role,
+                'action': item.action, 'entity_type': item.entity_type,
+                'entity_id': item.entity_id, 'summary': item.summary,
+                'details': item.details, 'created_at': item.created_at.isoformat(),
+            } for item in page_obj.object_list],
+            'total': paginator.count, 'page': page_obj.number,
+            'pages': paginator.num_pages,
+            'actions': list(ActivityLog.objects.order_by().values_list('action', flat=True).distinct().order_by('action')),
+        })
 
 
 class AdminStudentList(StaffAPIView):
@@ -381,6 +486,9 @@ class AdminInquiryList(StaffAPIView):
                 writer.writerow(map(spreadsheet_safe, [item.reference, item.full_name, item.email, item.phone, item.course.name,
                                                        item.programme_type, item.intake, item.destination, item.destination_city, item.student_location, item.event.name,
                                                        item.status, item.created_at.isoformat()]))
+            record_activity(request, 'inquiries.exported', 'Inquiry',
+                            'Filtered inquiries were exported as CSV.',
+                            details={'record_count': qs.count()})
             return response
         paginator = InquiryPagination()
         page = paginator.paginate_queryset(qs, request, view=self)
@@ -399,6 +507,10 @@ class AdminInquiryList(StaffAPIView):
             inquiry, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        record_activity(request, 'inquiry.updated', 'Inquiry',
+                        'Inquiry status or internal notes were updated.',
+                        entity_id=inquiry.reference,
+                        details={'status': inquiry.status})
         return Response({'inquiry': AdminInquirySerializer(inquiry).data})
 
 
@@ -419,6 +531,9 @@ class AdminInquiryDetail(StaffAPIView):
         serializer = self.get_serializer(item, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        record_activity(request, 'inquiry.updated', 'Inquiry',
+                        'Inquiry status or internal notes were updated.',
+                        entity_id=item.reference, details={'status': item.status})
         return Response({'inquiry': AdminInquirySerializer(item).data})
 
 
@@ -432,7 +547,9 @@ class AdminCourseList(StaffAPIView):
         self.require_catalog_write()
         serializer = CourseSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        course = serializer.save()
+        record_activity(request, 'course.created', 'Course', 'Course was added to the catalogue.',
+                        entity_id=course.pk, details={'name': course.name})
         return Response({'course': serializer.data}, status=status.HTTP_201_CREATED)
 
 
@@ -446,7 +563,9 @@ class AdminUniversityList(StaffAPIView):
         self.require_catalog_write()
         serializer = UniversitySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        university = serializer.save()
+        record_activity(request, 'university.created', 'University', 'University was added to the catalogue.',
+                        entity_id=university.pk, details={'name': university.name})
         return Response({'university': serializer.data}, status=status.HTTP_201_CREATED)
 
 
@@ -459,6 +578,8 @@ class AdminUniversityDetail(StaffAPIView):
         serializer = UniversitySerializer(university, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        record_activity(request, 'university.updated', 'University', 'University details were updated.',
+                        entity_id=university.pk, details={'name': university.name})
         return Response({'university': serializer.data})
 
 
@@ -480,6 +601,8 @@ class AdminCourseDetail(StaffAPIView):
         serializer = CourseSerializer(course, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        record_activity(request, 'course.updated', 'Course', 'Course details were updated.',
+                        entity_id=course.pk, details={'name': course.name})
         return Response({'course': serializer.data})
 
     def delete(self, request, course_id):
@@ -487,6 +610,8 @@ class AdminCourseDetail(StaffAPIView):
         course = self.get_object(course_id)
         course.active = False
         course.save(update_fields=['active'])
+        record_activity(request, 'course.deactivated', 'Course', 'Course was deactivated.',
+                        entity_id=course.pk, details={'name': course.name})
         return Response({'ok': True})
 
 
@@ -500,7 +625,9 @@ class AdminEventList(StaffAPIView):
         self.require_catalog_write()
         serializer = EventSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        event = serializer.save()
+        record_activity(request, 'event.created', 'Event', 'Event was created.',
+                        entity_id=event.pk, details={'name': event.name})
         return Response({'event': serializer.data}, status=status.HTTP_201_CREATED)
 
 
@@ -522,13 +649,18 @@ class AdminEventDetail(StaffAPIView):
         serializer = EventSerializer(event, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        record_activity(request, 'event.updated', 'Event', 'Event details were updated.',
+                        entity_id=event.pk, details={'name': event.name})
         return Response({'event': serializer.data})
 
     def delete(self, request, event_id):
         self.require_catalog_write()
         event = self.get_object(event_id)
         try:
+            event_name = event.name
             event.delete()
         except ProtectedError:
             return Response({'error': 'This event has inquiries and cannot be deleted.'}, status=status.HTTP_409_CONFLICT)
+        record_activity(request, 'event.deleted', 'Event', 'Event was deleted.',
+                        entity_id=event_id, details={'name': event_name})
         return Response({'ok': True})

@@ -4,3 +4,4 @@ djangorestframework>=3.16.1,<4
 dj-database-url==2.3.0
 psycopg[binary]>=3.2.10,<4.0
 python-dotenv>=1.1,<2
+cryptography>=44,<47

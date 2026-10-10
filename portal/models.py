@@ -31,7 +31,25 @@ class StaffProfile(models.Model):
 class PortalAccessCode(models.Model):
     name = models.CharField(max_length=40, unique=True, default='super_admin')
     code_hash = models.CharField(max_length=128)
+    code_encrypted = models.TextField(blank=True, default='')
     updated_at = models.DateTimeField(auto_now=True)
+
+
+class ActivityLog(models.Model):
+    actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                              related_name='portal_activity')
+    actor_label = models.CharField(max_length=150)
+    actor_role = models.CharField(max_length=30)
+    action = models.CharField(max_length=80, db_index=True)
+    entity_type = models.CharField(max_length=60)
+    entity_id = models.CharField(max_length=80, blank=True)
+    summary = models.CharField(max_length=255)
+    details = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+        indexes = [models.Index(fields=['action', '-created_at'], name='activity_action_date_idx')]
 
 
 class PortalOption(models.Model):

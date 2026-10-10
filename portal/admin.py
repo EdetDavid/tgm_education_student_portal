@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth.models import Group, User
 
-from .models import Course, CourseOffering, Event, Inquiry, PortalAccessCode, PortalOption, StaffProfile, Student, University
+from .models import ActivityLog, Course, CourseOffering, Event, Inquiry, PortalAccessCode, PortalOption, StaffProfile, Student, University
 
 
 admin.site.unregister(User)
@@ -119,8 +119,8 @@ class StaffProfileAdmin(admin.ModelAdmin):
 @admin.register(PortalAccessCode)
 class PortalAccessCodeAdmin(admin.ModelAdmin):
     list_display = ('name', 'updated_at')
-    readonly_fields = ('name', 'code_hash', 'updated_at')
-    description = 'Access codes are managed through the Super Admin portal. Hashes are never shown in plain text.'
+    readonly_fields = ('name', 'code_hash', 'code_encrypted', 'updated_at')
+    description = 'Access codes are managed through the Super Admin portal. Codes are encrypted at rest.'
 
 
 @admin.register(PortalOption)
@@ -129,3 +129,21 @@ class PortalOptionAdmin(admin.ModelAdmin):
     list_filter = ('option_type', 'active')
     search_fields = ('value',)
     list_editable = ('sort_order', 'active')
+
+
+@admin.register(ActivityLog)
+class ActivityLogAdmin(admin.ModelAdmin):
+    list_display = ('created_at', 'actor_label', 'actor_role', 'action', 'entity_type', 'entity_id', 'summary')
+    list_filter = ('actor_role', 'action', 'entity_type', 'created_at')
+    search_fields = ('actor_label', 'action', 'entity_type', 'entity_id', 'summary')
+    readonly_fields = ('actor', 'actor_label', 'actor_role', 'action', 'entity_type', 'entity_id', 'summary', 'details', 'created_at')
+    ordering = ('-created_at',)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

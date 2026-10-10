@@ -5,7 +5,7 @@ from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from portal.models import Course, CourseOffering, Event, Inquiry, Student, University
+from portal.models import ActivityLog, Course, CourseOffering, Event, Inquiry, Student, University
 
 
 class PortalApiTests(TestCase):
@@ -87,6 +87,35 @@ class PortalApiTests(TestCase):
         response = self.client.post('/api/inquiries/', self.payload(), format='json', HTTP_X_CSRFTOKEN=self.csrf())
         self.assertEqual(response.status_code, 201)
 
+    def test_student_applications_are_private_and_return_live_status(self):
+        response = self.client.post('/api/inquiries/', self.payload(), format='json')
+        inquiry = Inquiry.objects.get(reference=response.json()['reference'])
+        inquiry.status = 'Contacted'
+        inquiry.save(update_fields=['status'])
+
+        student = get_user_model().objects.create_user(
+            username='amara', email='AMARA@example.com', password='TestOnly934!')
+        self.client.force_login(student)
+        result = self.client.get('/api/student/applications/')
+
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(len(result.json()['applications']), 1)
+        self.assertEqual(result.json()['applications'][0]['status'], 'Contacted')
+        self.assertEqual(result.json()['applications'][0]['reference'], inquiry.reference)
+
+        staff_client = APIClient()
+        staff_client.force_login(self.staff)
+        self.assertEqual(staff_client.get('/api/student/applications/').status_code, 403)
+
+    def test_student_application_endpoint_requires_login_and_limits_by_account_email(self):
+        self.client.post('/api/inquiries/', self.payload(), format='json')
+        self.assertEqual(self.client.get('/api/student/applications/').status_code, 403)
+
+        other = get_user_model().objects.create_user(
+            username='other-student', email='other@example.com', password='TestOnly934!')
+        self.client.force_login(other)
+        self.assertEqual(self.client.get('/api/student/applications/').json()['applications'], [])
+
     def test_student_submission_links_selected_university_offering(self):
         university = University.objects.create(
             name='University of Lagos', country='Nigeria', city='Lagos')
@@ -117,6 +146,40 @@ class PortalApiTests(TestCase):
              'price': '18000.00', 'location': 'Lagos', 'intakes': ['January'], 'active': True},
             format='json', HTTP_X_CSRFTOKEN=csrf_token)
         self.assertEqual(course_response.status_code, 201, course_response.content)
+
+    def test_activity_log_is_recorded_and_visible_only_to_super_admin(self):
+        response = self.client.post('/api/inquiries/', self.payload(), format='json')
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(ActivityLog.objects.filter(action='inquiry.submitted').exists())
+
+        self.sign_in()
+        self.assertEqual(self.client.get('/api/admin/activity/').status_code, 403)
+
+        super_admin = get_user_model().objects.create_superuser(
+            username='root', password='RootTest934!', email='root@example.com')
+        self.client.force_login(super_admin)
+        activity_response = self.client.get('/api/admin/activity/')
+        self.assertEqual(activity_response.status_code, 200)
+        self.assertIn('inquiry.submitted', {
+            item['action'] for item in activity_response.json()['activities']})
+
+    def test_only_super_admin_can_view_and_rotate_access_codes(self):
+        self.sign_in()
+        self.assertEqual(self.client.get('/api/admin/access-code/').status_code, 403)
+        self.assertEqual(self.client.get('/api/admin/organisation-code/').status_code, 403)
+
+        super_admin = get_user_model().objects.create_superuser(
+            username='code-admin', password='RootTest934!', email='root@example.com')
+        self.client.force_login(super_admin)
+        csrf_token = self.csrf()
+        for path, field, code in (
+            ('/api/admin/access-code/', 'access_code', 'new-super-secret'),
+            ('/api/admin/organisation-code/', 'organisation_code', 'new-organisation-secret'),
+        ):
+            with self.subTest(path=path):
+                update = self.client.post(path, {field: code}, format='json', HTTP_X_CSRFTOKEN=csrf_token)
+                self.assertEqual(update.status_code, 200, update.content)
+                self.assertEqual(self.client.get(path).json()[field], code)
 
     def test_admin_inquiry_search_update_export_and_dashboard(self):
         self.client.post('/api/inquiries/', self.payload(), format='json')
