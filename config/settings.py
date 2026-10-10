@@ -15,6 +15,17 @@ SECRET_KEY = os.environ.get(
     'local-development-key-change-before-deploy',
 )
 DEBUG = os.environ.get('DJANGO_DEBUG', 'true').lower() == 'true'
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {'class': 'logging.StreamHandler', 'stream': 'ext://sys.stderr'},
+    },
+    'loggers': {
+        'django.request': {'handlers': ['console'], 'level': 'ERROR', 'propagate': False},
+    },
+}
 DATABASE_URL = os.environ.get('POSTGRES_URL') or os.environ.get('DATABASE_URL')
 
 if not DEBUG and (

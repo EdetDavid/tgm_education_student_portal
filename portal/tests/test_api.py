@@ -181,6 +181,40 @@ class PortalApiTests(TestCase):
                 self.assertEqual(update.status_code, 200, update.content)
                 self.assertEqual(self.client.get(path).json()[field], code)
 
+    def test_super_admin_staff_management_excludes_students_and_supports_crud_and_role_changes(self):
+        student = get_user_model().objects.create_user(
+            username='student-account', email='student@example.com', password='StudentTest934!')
+        super_admin = get_user_model().objects.create_superuser(
+            username='manager', password='ManagerTest934!', email='manager@example.com')
+        self.client.force_login(super_admin)
+
+        listing = self.client.get('/api/admin/users/')
+        self.assertEqual(listing.status_code, 200)
+        self.assertNotIn(student.username, [item['username'] for item in listing.json()['users']])
+
+        token = self.csrf()
+        created = self.client.post('/api/admin/users/', {
+            'username': 'new-counsellor', 'password': 'CounsellorCreate934!#',
+            'role': 'Counsellor', 'staff_id': 'TGM-NEW-01',
+        }, format='json', HTTP_X_CSRFTOKEN=token)
+        self.assertEqual(created.status_code, 201, created.content)
+        new_user_id = created.json()['user']['id']
+        self.assertEqual(created.json()['user']['role'], 'Counsellor')
+        created_user = get_user_model().objects.get(pk=new_user_id)
+        self.assertQuerySetEqual(created_user.groups.order_by('name'), ['Counsellor'], transform=lambda group: group.name)
+
+        changed = self.client.patch(f'/api/admin/users/{new_user_id}/', {
+            'role': 'Admin', 'staff_id': 'TGM-NEW-01',
+        }, format='json', HTTP_X_CSRFTOKEN=token)
+        self.assertEqual(changed.status_code, 200, changed.content)
+        self.assertEqual(changed.json()['user']['role'], 'Admin')
+        self.assertQuerySetEqual(created_user.groups.order_by('name'), ['Admin'], transform=lambda group: group.name)
+
+        removed = self.client.delete(f'/api/admin/users/{new_user_id}/', HTTP_X_CSRFTOKEN=token)
+        self.assertEqual(removed.status_code, 204)
+        self.assertFalse(get_user_model().objects.filter(username='new-counsellor').exists())
+        self.assertEqual(self.client.delete(f'/api/admin/users/{super_admin.pk}/', HTTP_X_CSRFTOKEN=token).status_code, 400)
+
     def test_admin_inquiry_search_update_export_and_dashboard(self):
         self.client.post('/api/inquiries/', self.payload(), format='json')
         self.sign_in()

@@ -4,8 +4,9 @@ from datetime import timedelta
 
 from django.contrib.auth import authenticate, login, logout, get_user_model
 from django.contrib.auth.hashers import make_password, check_password
-from django.contrib.auth.models import Group
+from django.contrib.auth.password_validation import validate_password
 from django.conf import settings
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import TruncDate
@@ -26,6 +27,7 @@ from rest_framework.views import APIView
 
 from .models import ActivityLog, Course, Event, Inquiry, Student, StaffProfile, PortalAccessCode, PortalOption, University
 from .activity import record_activity
+from .user_groups import assign_role_group
 from .access_codes import decrypt_access_code, encrypt_access_code
 from .queries import filtered_inquiries
 from .csv_export import spreadsheet_safe
@@ -233,6 +235,7 @@ class StaffSignup(generics.GenericAPIView):
             if User.objects.filter(username=values['username']).exists() or User.objects.filter(email__iexact=values['email']).exists():
                 return Response({'error': 'That username or email is already registered.'}, status=400)
             user = User.objects.create_user(values['username'], email=values['email'], password=values['password'], first_name=values['full_name'])
+            assign_role_group(user, 'Student')
             login(request, user)
             record_activity(request, 'account.created', 'Account', 'Student account registered.', actor=user,
                             details={'role': 'Student'})
@@ -262,11 +265,9 @@ class StaffSignup(generics.GenericAPIView):
         else:
             user.is_staff = True
             user.save(update_fields=['is_staff'])
-            if role == 'Counsellor':
-                group, _ = Group.objects.get_or_create(name='Counsellor')
-                user.groups.add(group)
             StaffProfile.objects.create(user=user, role=role, staff_id=values['staff_id'],
                                         organisation_code_hash=make_password(values['organisation_code']))
+        assign_role_group(user, role)
         login(request, user)
         record_activity(request, 'account.created', 'Account', f'{role} account registered.', actor=user,
                         details={'role': role})
@@ -387,11 +388,107 @@ class SuperAdminAPIView(StaffAPIView):
 
 
 class AdminUserManagement(SuperAdminAPIView):
+    STAFF_ROLES = ('Admin', 'Counsellor', 'Super Admin')
+
+    @staticmethod
+    def serialize_user(user):
+        profile = getattr(user, 'staff_profile', None)
+        role = ('Super Admin' if user.is_superuser else
+                'Counsellor' if user.groups.filter(name='Counsellor').exists() else 'Admin')
+        return {'id': user.id, 'username': user.username, 'email': user.email,
+                'staff_id': profile.staff_id if profile else '', 'role': role,
+                'active': user.is_active, 'date_joined': user.date_joined.isoformat()}
+
     def get(self, request):
-        users = get_user_model().objects.prefetch_related('groups').order_by('username')
-        return Response({'users': [{'id': user.id, 'username': user.username, 'email': user.email,
-                                    'role': 'Super Admin' if user.is_superuser else ('Counsellor' if user.groups.filter(name='Counsellor').exists() else ('Admin' if user.is_staff else 'Student')),
-                                    'active': user.is_active, 'date_joined': user.date_joined.isoformat()} for user in users]})
+        users = get_user_model().objects.filter(Q(is_staff=True) | Q(is_superuser=True)).select_related(
+            'staff_profile').prefetch_related('groups').order_by('username')
+        return Response({'users': [self.serialize_user(user) for user in users]})
+
+    def post(self, request):
+        role = str(request.data.get('role', '')).strip()
+        username = str(request.data.get('username', '')).strip()
+        password = str(request.data.get('password', ''))
+        staff_id = str(request.data.get('staff_id', '')).strip()
+        User = get_user_model()
+        if role not in self.STAFF_ROLES:
+            raise ValidationError({'role': 'Choose Admin, Counsellor or Super Admin.'})
+        if not username or len(username) > 150:
+            raise ValidationError({'username': 'Enter a username of at most 150 characters.'})
+        if User.objects.filter(username__iexact=username).exists():
+            raise ValidationError({'username': 'That username is already in use.'})
+        if role != 'Super Admin' and not staff_id:
+            raise ValidationError({'staff_id': 'A staff ID is required for Admin and Counsellor accounts.'})
+        if staff_id and StaffProfile.objects.filter(staff_id__iexact=staff_id).exists():
+            raise ValidationError({'staff_id': 'That staff ID is already assigned.'})
+        try:
+            validate_password(password)
+        except DjangoValidationError as exc:
+            raise ValidationError({'password': list(exc.messages)})
+
+        with transaction.atomic():
+            user = User.objects.create_user(username=username, password=password)
+            user.is_staff = True
+            user.is_superuser = role == 'Super Admin'
+            user.save(update_fields=['is_staff', 'is_superuser'])
+            assign_role_group(user, role)
+            if role != 'Super Admin':
+                StaffProfile.objects.create(user=user, role=role, staff_id=staff_id,
+                                            organisation_code_hash=make_password(uuid.uuid4().hex))
+        record_activity(request, 'staff.created', 'Staff account', 'Staff account was created.',
+                        entity_id=user.username, details={'role': role})
+        return Response({'user': self.serialize_user(user)}, status=status.HTTP_201_CREATED)
+
+    def patch(self, request, user_id):
+        try:
+            user = get_user_model().objects.filter(Q(is_staff=True) | Q(is_superuser=True)).select_related(
+                'staff_profile').get(pk=user_id)
+        except get_user_model().DoesNotExist:
+            raise NotFound('Staff account not found.')
+        role = str(request.data.get('role', '')).strip()
+        if role not in self.STAFF_ROLES:
+            raise ValidationError({'role': 'Choose Admin, Counsellor or Super Admin.'})
+        if user.pk == request.user.pk and role != self.serialize_user(user)['role']:
+            raise ValidationError({'role': 'You cannot change your own role.'})
+        staff_id = str(request.data.get('staff_id', '')).strip()
+        profile = getattr(user, 'staff_profile', None)
+        if role != 'Super Admin' and not (staff_id or (profile and profile.staff_id)):
+            raise ValidationError({'staff_id': 'A staff ID is required for Admin and Counsellor accounts.'})
+        next_staff_id = staff_id or (profile.staff_id if profile else '')
+        if next_staff_id and StaffProfile.objects.filter(staff_id__iexact=next_staff_id).exclude(user=user).exists():
+            raise ValidationError({'staff_id': 'That staff ID is already assigned.'})
+
+        old_role = self.serialize_user(user)['role']
+        user.is_staff = True
+        user.is_superuser = role == 'Super Admin'
+        user.save(update_fields=['is_staff', 'is_superuser'])
+        if role == 'Super Admin':
+            if profile:
+                profile.delete()
+        elif profile:
+            profile.role = role
+            profile.staff_id = next_staff_id
+            profile.save(update_fields=['role', 'staff_id'])
+        else:
+            StaffProfile.objects.create(user=user, role=role, staff_id=next_staff_id,
+                                        organisation_code_hash=make_password(uuid.uuid4().hex))
+        assign_role_group(user, role)
+        record_activity(request, 'staff.role_updated', 'Staff account', 'Staff account role was changed.',
+                        entity_id=user.username, details={'from': old_role, 'to': role})
+        return Response({'user': self.serialize_user(user)})
+
+    def delete(self, request, user_id):
+        try:
+            user = get_user_model().objects.filter(Q(is_staff=True) | Q(is_superuser=True)).get(pk=user_id)
+        except get_user_model().DoesNotExist:
+            raise NotFound('Staff account not found.')
+        if user.pk == request.user.pk:
+            raise ValidationError({'detail': 'You cannot delete your own account.'})
+        username = user.username
+        role = 'Super Admin' if user.is_superuser else 'Staff'
+        user.delete()
+        record_activity(request, 'staff.deleted', 'Staff account', 'Staff account was deleted.',
+                        entity_id=username, details={'role': role})
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class AdminActivityFeed(SuperAdminAPIView):

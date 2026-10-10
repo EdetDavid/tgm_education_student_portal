@@ -3,6 +3,7 @@ from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth.models import Group, User
 
 from .models import ActivityLog, Course, CourseOffering, Event, Inquiry, PortalAccessCode, PortalOption, StaffProfile, Student, University
+from .user_groups import assign_role_group, role_group_for_user
 
 
 admin.site.unregister(User)
@@ -18,6 +19,10 @@ class PortalUserAdmin(DjangoUserAdmin):
     list_display = ('username', 'email', 'portal_groups', 'is_staff', 'is_active', 'date_joined')
     list_filter = ('is_staff', 'is_superuser', 'is_active', 'groups')
     filter_horizontal = ('groups', 'user_permissions')
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        assign_role_group(form.instance, role_group_for_user(form.instance))
 
     @admin.display(description='Groups')
     def portal_groups(self, obj):

@@ -20,6 +20,7 @@ urlpatterns = [
     path('api/admin/access-code/', views.SuperAdminAccessCode.as_view(), name='super-admin-access-code'),
     path('api/admin/organisation-code/', views.SuperAdminOrganisationCode.as_view(), name='super-admin-organisation-code'),
     path('api/admin/users/', views.AdminUserManagement.as_view(), name='admin-users'),
+    path('api/admin/users/<int:user_id>/', views.AdminUserManagement.as_view(), name='admin-user-detail'),
     path('api/admin/activity/', views.AdminActivityFeed.as_view(), name='admin-activity'),
     path('api/admin/students/', views.AdminStudentList.as_view(), name='admin-students'),
     path('api/admin/logout/', views.AdminLogout.as_view()),
