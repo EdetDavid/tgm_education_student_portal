@@ -5,7 +5,7 @@ from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from portal.models import Course, Event, Inquiry, Student
+from portal.models import Course, CourseOffering, Event, Inquiry, Student, University
 
 
 class PortalApiTests(TestCase):
@@ -86,6 +86,37 @@ class PortalApiTests(TestCase):
         self.sign_in()
         response = self.client.post('/api/inquiries/', self.payload(), format='json', HTTP_X_CSRFTOKEN=self.csrf())
         self.assertEqual(response.status_code, 201)
+
+    def test_student_submission_links_selected_university_offering(self):
+        university = University.objects.create(
+            name='University of Lagos', country='Nigeria', city='Lagos')
+        offering = CourseOffering.objects.create(
+            course=self.course, university=university, region='Africa',
+            institution=university.name, country=university.country,
+            city=university.city)
+
+        response = self.client.post(
+            '/api/inquiries/', self.payload(university_id=offering.pk), format='json')
+
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertEqual(Inquiry.objects.get().course_offering_id, offering.pk)
+
+    def test_admin_can_create_courses_and_universities(self):
+        self.sign_in()
+        csrf_token = self.csrf()
+        university_response = self.client.post(
+            '/api/admin/universities/',
+            {'name': 'University of Lagos', 'country': 'Nigeria', 'city': 'Lagos', 'image_url': ''},
+            format='json', HTTP_X_CSRFTOKEN=csrf_token)
+        self.assertEqual(university_response.status_code, 201, university_response.content)
+
+        course_response = self.client.post(
+            '/api/admin/courses/',
+            {'name': 'Public Health', 'institution': 'University of Lagos', 'region': 'Africa',
+             'study_country': 'Nigeria', 'study_city': 'Lagos', 'level': 'Undergraduate',
+             'price': '18000.00', 'location': 'Lagos', 'intakes': ['January'], 'active': True},
+            format='json', HTTP_X_CSRFTOKEN=csrf_token)
+        self.assertEqual(course_response.status_code, 201, course_response.content)
 
     def test_admin_inquiry_search_update_export_and_dashboard(self):
         self.client.post('/api/inquiries/', self.payload(), format='json')

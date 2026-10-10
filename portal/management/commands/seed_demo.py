@@ -6,8 +6,7 @@ from django.db.models.functions import Lower
 from django.utils import timezone
 
 from portal.intakes import available_intakes
-from portal.models import Course, Event, Inquiry, Student
-from portal.serializers import DESTINATIONS
+from portal.models import Course, Event, Inquiry, PortalOption, Student
 
 
 COURSES = [
@@ -60,6 +59,11 @@ class Command(BaseCommand):
         count = options['inquiries']
         if not 0 <= count <= 10000:
             raise CommandError('--inquiries must be between 0 and 10000.')
+        destinations = list(PortalOption.objects.filter(
+            option_type='destination', active=True
+        ).order_by('sort_order', 'value').values_list('value', flat=True))
+        if count and not destinations:
+            raise CommandError('Add at least one active study destination before seeding inquiries.')
         courses = []
         for index, name in enumerate(COURSES):
             institution, region, country, city = CATALOGUE[index]
@@ -101,7 +105,7 @@ class Command(BaseCommand):
             inquiry = Inquiry(
                 full_name=full_name, email=email, phone=phone, course=course,
                 intake=intakes[(index // len(courses)) % len(intakes)],
-                destination=DESTINATIONS[(index // 3) % len(DESTINATIONS)],
+                destination=destinations[(index // 3) % len(destinations)],
                 student_location=location, event=events[index % len(events)],
                 message=['Please tell me about scholarships.', 'Can I study part-time?', '', 'What documents do I need?'][index % 4],
                 reference=reference, status=Inquiry.STATUS_CHOICES[(index // 5) % 4][0],

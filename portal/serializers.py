@@ -74,7 +74,7 @@ class StudentInquiryCreateSerializer(serializers.Serializer):
     course_id = serializers.PrimaryKeyRelatedField(
         source='course', queryset=Course.objects.filter(active=True))
     university_id = serializers.IntegerField(required=False, allow_null=True)
-    programme_type = serializers.CharField(max_length=40)
+    programme_type = serializers.CharField(max_length=40, required=False, allow_blank=True)
     intake = serializers.CharField(max_length=40, trim_whitespace=True)
     destination = serializers.CharField(max_length=100)
     destination_city = serializers.CharField(max_length=100, trim_whitespace=True, required=False, allow_blank=True, default='')
@@ -112,21 +112,32 @@ class StudentInquiryCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError('Choose a configured study destination.')
         return value
 
-    def validate(self, attrs):
-        attrs = super().validate(attrs)
-        university_id = attrs.pop('university_id', None)
-        if university_id is not None:
-            if not CourseOffering.objects.filter(id=university_id, course=attrs['course'], active=True).exists():
-                raise serializers.ValidationError({'university_id': 'Choose a university offering this course.'})
-        attrs['course_offering_id'] = university_id
-        return attrs
-
     def validate_phone(self, value):
         if not re.fullmatch(r'[+\d().\-\s]{7,30}', value) or not 7 <= len(re.sub(r'\D', '', value)) <= 15:
             raise serializers.ValidationError('Enter a valid phone number.')
         return value
 
     def validate(self, attrs):
+        # Keep supporting older clients that do not submit a programme type,
+        # while sourcing the default from the admin-managed options.
+        programme_type = attrs.get('programme_type', '').strip()
+        programme_options = configured_options('programme_type')
+        if not programme_type:
+            if not programme_options:
+                raise serializers.ValidationError(
+                    {'programme_type': 'No programme types are currently available.'})
+            attrs['programme_type'] = programme_options[0]
+        elif programme_type not in programme_options:
+            raise serializers.ValidationError(
+                {'programme_type': 'Choose a configured programme type.'})
+
+        university_id = attrs.pop('university_id', None)
+        if university_id is not None and not CourseOffering.objects.filter(
+                pk=university_id, course=attrs['course'], active=True).exists():
+            raise serializers.ValidationError(
+                {'university_id': 'Choose a university offering this course.'})
+        attrs['course_offering_id'] = university_id
+
         course = attrs['course']
         valid_intakes = available_intakes(course.intakes)
         if attrs['intake'] not in valid_intakes:
